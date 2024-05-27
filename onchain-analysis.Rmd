@@ -1,0 +1,68 @@
+---
+title: "Onchain benchmarks"
+output: html_notebook
+Author: Victor Bernardes
+Date: 2024-05-26
+---
+
+```{r}
+
+benchSend12nodes <- read.csv('../onchain-1k/bench12nodes-1k-onchain-send', header = T)
+metricSend12nodes <- read.csv('../onchain-1k/metric-send-1k-onchain-12nodes', header= T)
+
+```
+
+```{r}
+
+
+cpu_load <- metricSend12nodes$value[metricSend12nodes$name == 'system_cpu_sysload']
+cpu_load <- as.integer(cpu_load)
+cpu_load <- cpu_load[cpu_load > 1000]
+
+summary(cpu_load)
+hist(cpu_load, breaks = 10)
+plot(benchSend12nodes$Latency)
+boxplot(cpu_load)
+```
+
+```{r}
+
+errors <- benchSend12nodes$responseCode[benchSend12nodes$responseCode != 200]
+length(errors) / length(benchSend12nodes$responseCode) * 100
+
+```
+
+```{r}
+
+# Load necessary libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+
+# Read the CSV data into R
+data <- read.csv("../onchain-1k/bench16nodes-1k-onchain-recv")
+
+# Convert the timestamp to a POSIXct date-time format
+data$timeStamp <- as.POSIXct(data$timeStamp / 1000, origin="1970-01-01")
+
+# Create a new column with rounded seconds for grouping
+data$second <- floor_date(data$timeStamp, unit = "second")
+
+# Calculate the number of transactions per second
+tps <- data %>%
+  group_by(second) %>%
+  summarise(transactions = n())
+
+# Print the transactions per second
+print(tps)
+mean(tps$transactions)
+
+# Plot transactions per second
+ggplot(tps, aes(x = second, y = transactions)) +
+  geom_line() +
+  labs(title = "Transactions Per Second",
+       x = "Time (seconds)",
+       y = "Number of Transactions")
+
+```
