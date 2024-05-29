@@ -1,0 +1,238 @@
+---
+title: "sidechain-analysis"
+author: "Victor Bernardes"
+date: "2024-05-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+# library(patchwork)
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+
+```
+
+# Load data
+
+```{r}
+
+benchSend4nodes <- read.csv('./data/sidechain-repl/bench4nodes-1k-sidechain-send', header = T)
+#metricSend4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes-full', header= T)
+
+benchSend8nodes <- read.csv('./data/sidechain-repl/bench8nodes-1k-sidechain-send', header = T)
+#metricSend8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes-full', header= T)
+
+benchSend12nodes <- read.csv('./data/sidechain-repl/bench12nodes-1k-sidechain-send', header = T)
+#metricSend12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes-full', header= T)
+
+# ??? Cade esses DADOS MEU DEUS?
+# benchSend16nodes <- read.csv('./data/sidechain-repl/bench16nodes-1k-sidechain-send', header = T)
+# metricSend16nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-16nodes', header= T)
+
+benchRecv4nodes <-  read.csv('./data/sidechain-repl/bench4nodes-1k-sidechain-recv', header = T)
+#metricRecv4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes', header= T)
+
+benchRecv8nodes <- read.csv('./data/sidechain-repl/bench8nodes-1k-sidechain-recv', header = T)
+#metricRecv8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes', header= T)
+
+benchRecv12nodes <- read.csv('./data/sidechain-repl/bench12nodes-1k-sidechain-recv', header = T)
+#metricRecv12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes', header= T)
+
+#benchRecv16nodes <- read.csv('./data/sidechain-repl/bench16nodes-1k-sidechain-recv', header = T)
+#metricRecv16nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-16nodes', header= T)
+
+
+```
+
+# Load onchain data
+
+```{r}
+
+onchain.benchSend4nodes <- read.csv('./data/onchain-1k/bench4nodes-1k-onchain-send', header = T)
+onchain.metricSend4nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-4nodes', header= T)
+
+onchain.benchSend8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-send', header = T)
+onchain.metricSend8nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-8nodes', header= T)
+
+onchain.benchSend12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-send', header = T)
+onchain.metricSend12nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-12nodes', header= T)
+
+onchain.benchSend16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-send', header = T)
+onchain.metricSend16nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-16nodes', header= T)
+
+onchain.benchRecv4nodes <-  read.csv('./data/onchain-1k/bench4nodes-1k-onchain-recv', header = T)
+onchain.metricRecv4nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-4nodes', header= T)
+
+onchain.benchRecv8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-recv', header = T)
+onchain.metricRecv8nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-8nodes', header= T)
+
+onchain.benchRecv12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-recv', header = T)
+onchain.metricRecv12nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-12nodes', header= T)
+
+onchain.benchRecv16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-recv', header = T)
+onchain.metricRecv16nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-16nodes', header= T)
+
+```
+
+# Create TPS boxplot
+
+```{r}
+
+# Read: bs4n - bench send 4..16 nodes
+bs4n <- subset(benchSend4nodes, responseCode == 200)
+bs8n <- subset(benchSend8nodes, responseCode == 200)
+bs12n <- subset(benchSend12nodes, responseCode == 200)
+
+# Read: bs4n - bench recv 4..16 nodes
+br4n <- subset(benchRecv4nodes, responseCode == 200)
+br8n <- subset(benchRecv8nodes, responseCode == 200)
+br12n <- subset(benchRecv12nodes, responseCode == 200)
+
+tpsbs4n <- getTps(bs4n)
+tpsbs8n <- getTps(bs8n)
+tpsbs12n <- getTps(bs12n)
+
+tpsbr4n <- getTps(br4n)
+tpsbr8n <- getTps(br8n)
+tpsbr12n <- getTps(br12n)
+
+
+df_tps_recv_sidechain <- data.frame(
+  tps = c(tpsbr4n$transactions, tpsbr8n$transactions, tpsbr12n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós"), time = c(length(tpsbr4n$transactions), length(tpsbr8n$transactions), length(tpsbr12n$transactions)))
+  )
+  
+
+df_tps_send_sidechain <- data.frame(
+  tps = c(tpsbs4n$transactions, tpsbs8n$transactions, tpsbs12n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós"), time = c(length(tpsbs4n$transactions), length(tpsbs8n$transactions), length(tpsbs12n$transactions)))
+  )
+  
+df_tps_send_sidechain$scenario <- factor(df_tps_send_sidechain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+
+
+df_tps_send_sidechain <- df_tps_send_sidechain %>%
+  mutate(case = "Envio")
+
+df_tps_recv_sidechain <- df_tps_recv_sidechain %>%
+  mutate(case = "Recuperação")
+
+
+merged_df_sidechain <- rbind(df_tps_recv_sidechain, df_tps_send_sidechain)
+
+
+p <- ggplot(merged_df_sidechain, aes(x = scenario, y = tps)) +
+  geom_boxplot() +
+  labs(x = "Número de nós na rede",
+       y = "Transações por segundo (TPS)") +
+  facet_grid(~case) + 
+  theme_bw() 
+
+# ggsave('./figures/sidechain-tps-grouped.png')
+
+```
+
+# TPS SEND E RECV ONCHAIN VS SIDECHAIN
+
+```{r}
+
+# ggsave('./figures/onchain-tps-grouped.png')
+
+#### Onchain 
+
+
+# Read: bs4n - bench send 4..16 nodes
+onchain.bs4n <- subset(onchain.benchSend4nodes, responseCode == 200)
+onchain.bs8n <- subset(onchain.benchSend8nodes, responseCode == 200)
+onchain.bs12n <- subset(onchain.benchSend12nodes, responseCode == 200)
+# onchain.bs16n <- subset(onchain.benchSend16nodes, responseCode == 200)
+# Read: bs4n - bench recv 4..16 nodes
+onchain.br4n <- subset(onchain.benchRecv4nodes, responseCode == 200)
+onchain.br8n <- subset(onchain.benchRecv8nodes, responseCode == 200)
+onchain.br12n <- subset(onchain.benchRecv12nodes, responseCode == 200)
+# onchain.br16n <- subset(onchain.benchRecv16nodes, responseCode == 200)
+
+
+onchain.tpsbs4n <- getTps(onchain.bs4n)
+onchain.tpsbs8n <- getTps(onchain.bs8n)
+onchain.tpsbs12n <- getTps(onchain.bs12n)
+
+onchain.tpsbr4n <- getTps(onchain.br4n)
+onchain.tpsbr8n <- getTps(onchain.br8n)
+onchain.tpsbr12n <- getTps(onchain.br12n)
+
+
+df_tps_recv_onchain <- data.frame(
+  tps = c(onchain.tpsbr4n$transactions, onchain.tpsbr8n$transactions, onchain.tpsbr12n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós"), time = c(length(onchain.tpsbr4n$transactions), length(onchain.tpsbr8n$transactions), length(onchain.tpsbr12n$transactions)))
+  )
+
+df_tps_recv_onchain$scenario <- factor(df_tps_recv_onchain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+df_tps_send_onchain <- data.frame(
+  tps = c(onchain.tpsbs4n$transactions, onchain.tpsbs8n$transactions, onchain.tpsbs12n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós"), time = c(length(onchain.tpsbs4n$transactions), length(onchain.tpsbs8n$transactions), length(onchain.tpsbs12n$transactions)))
+  )
+  
+
+df_tps_send_onchain$scenario <- factor(df_tps_send_onchain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+df_tps_send_onchain <- df_tps_send_onchain %>%
+  mutate(case = "Envio")
+
+df_tps_recv_onchain <- df_tps_recv_onchain %>%
+  mutate(case = "Recuperação")
+
+merged_df_onchain <- rbind(df_tps_recv_onchain, df_tps_send_onchain)
+
+g <- ggplot(merged_df_onchain, aes(x = scenario, y = tps)) +
+  geom_boxplot() +
+  labs(x = "Número de nós na rede",
+       y = "Transações por segundo (TPS)") +
+  facet_grid(~case) +
+  theme_bw()
+
+
+merged_df_onchain <- merged_df_onchain %>%
+  mutate(network = "onchain")
+
+merged_df_sidechain <- merged_df_sidechain %>%
+  mutate(network = "sidechain")
+
+merged <- rbind(merged_df_onchain, merged_df_sidechain)
+
+ggplot(merged, aes(x = scenario, y = tps)) +
+  geom_boxplot() +
+  labs(x = "Número de nós na rede",
+       y = "Transações por segundo (TPS)") +
+  facet_grid(case ~ network) +
+  theme_bw()
+
+# onchain.tpsbr4n
+# xValue <- seq(1,length(onchain.br4n), 1)
+# yValue <- tpsbr4n
+# data <- data.frame(xValue,yValue)
+
+# Plot
+ggplot(onchain.tpsbr4n, aes(x=second, y=transactions)) +
+  geom_line()
+
+# ggsave('./figures/sidechain-vs-onchain-boxplot.png')
+
+```
+
+# Teste gráfico de linhas agrupado
+
+```{r}
+
+```
+

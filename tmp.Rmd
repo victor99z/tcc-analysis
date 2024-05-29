@@ -1,0 +1,107 @@
+---
+title: "tmp"
+author: "Victor Bernardes"
+date: "2024-05-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# Load necessary libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+library(ggplot2)
+
+# Sample data for illustration purposes
+data <- data.frame(
+  time = rep(1:1000, times = 4),
+  latency = c(rnorm(10, mean = 50, sd = 10), rnorm(10, mean = 60, sd = 10), rnorm(10, mean = 70, sd = 10), rnorm(10, mean = 80, sd = 10)),
+  scenario = rep(c("Scenario 1", "Scenario 2", "Scenario 3", "Scenario 4"), each = 10)
+)
+
+# Create the plot
+p <- ggplot(data, aes(x = time, y = latency)) +
+  geom_point() +
+  geom_line() +  # Optionally add lines to connect the points
+  facet_grid(rows = vars(scenario)) +  # Facet by scenario
+  labs(title = "Latency Over Time for Different Scenarios",
+       x = "Time",
+       y = "Latency (ms)") +
+  theme_gray()
+
+# Display the plot
+print(p)
+
+```
+
+
+```{r}
+
+# library
+library(ggplot2)
+ 
+# create a data frame
+variety=rep(LETTERS[1:7], each=40)
+treatment=rep(c("high","low"),each=20)
+note=seq(1:280)+sample(1:150, 280, replace=T)
+data=data.frame(variety, treatment ,  note)
+ 
+# grouped boxplot
+ggplot(data, aes(x=variety, y=note, fill=treatment)) + 
+    geom_boxplot()
+
+```
+
+
+```{r}
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+# Sample data creation
+# Assuming we have a data frame named 'data' with columns:
+# nodes (number of nodes), system_cpu_sysload, system_disk_readbytes,
+# system_disk_writebytes, system_memory_used
+
+set.seed(123) # For reproducibility
+data <- data.frame(
+  nodes = rep(c(4, 8, 12, 16), each = 10),
+  system_cpu_sysload = runif(40, 0, 100),
+  system_disk_readbytes = runif(40, 0, 1000),
+  system_disk_writebytes = runif(40, 0, 1000),
+  system_memory_used = runif(40, 0, 32)
+)
+
+# Calculate average values for each metric, grouped by number of nodes
+# Calculate average values for each metric, grouped by number of nodes
+avg_data <- data %>%
+  group_by(nodes) %>%
+  summarize(
+    avg_cpu_sysload = mean(system_cpu_sysload),
+    avg_disk_readbytes = mean(system_disk_readbytes),
+    avg_disk_writebytes = mean(system_disk_writebytes),
+    avg_memory_used = mean(system_memory_used)
+  ) %>%
+  pivot_longer(cols = starts_with("avg"), 
+               names_to = "metric", 
+               values_to = "value")
+
+print(avg_data)
+
+# Create the ggplot
+ggplot(avg_data, aes(x = factor(nodes), y = value, color = metric, group = metric)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Average System Metrics by Number of Nodes",
+    x = "Number of Nodes",
+    y = "Average Value",
+    color = "Metric"
+  ) +
+  theme_bw()
+```
+

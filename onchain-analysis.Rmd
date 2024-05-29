@@ -1,68 +1,593 @@
 ---
 title: "Onchain benchmarks"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 Author: Victor Bernardes
-Date: 2024-05-26
+Date: "2024-05-26"
 ---
 
-```{r}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 
-benchSend12nodes <- read.csv('../onchain-1k/bench12nodes-1k-onchain-send', header = T)
-metricSend12nodes <- read.csv('../onchain-1k/metric-send-1k-onchain-12nodes', header= T)
-
-```
-
-```{r}
-
-
-cpu_load <- metricSend12nodes$value[metricSend12nodes$name == 'system_cpu_sysload']
-cpu_load <- as.integer(cpu_load)
-cpu_load <- cpu_load[cpu_load > 1000]
-
-summary(cpu_load)
-hist(cpu_load, breaks = 10)
-plot(benchSend12nodes$Latency)
-boxplot(cpu_load)
-```
-
-```{r}
-
-errors <- benchSend12nodes$responseCode[benchSend12nodes$responseCode != 200]
-length(errors) / length(benchSend12nodes$responseCode) * 100
-
-```
-
-```{r}
-
-# Load necessary libraries
 library(dplyr)
 library(lubridate)
 library(ggplot2)
 
+rm(list = ls())
 
-# Read the CSV data into R
-data <- read.csv("../onchain-1k/bench16nodes-1k-onchain-recv")
-
-# Convert the timestamp to a POSIXct date-time format
-data$timeStamp <- as.POSIXct(data$timeStamp / 1000, origin="1970-01-01")
-
-# Create a new column with rounded seconds for grouping
-data$second <- floor_date(data$timeStamp, unit = "second")
-
-# Calculate the number of transactions per second
-tps <- data %>%
-  group_by(second) %>%
-  summarise(transactions = n())
-
-# Print the transactions per second
-print(tps)
-mean(tps$transactions)
-
-# Plot transactions per second
-ggplot(tps, aes(x = second, y = transactions)) +
-  geom_line() +
-  labs(title = "Transactions Per Second",
-       x = "Time (seconds)",
-       y = "Number of Transactions")
+source('./functions.R', local = knitr::knit_global())
 
 ```
+
+# leitura de todos os datasets para onchain
+
+```{r}
+
+benchSend4nodes <- read.csv('./data/onchain-1k/bench4nodes-1k-onchain-send', header = T)
+metricSend4nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-4nodes', header= T)
+
+benchSend8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-send', header = T)
+metricSend8nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-8nodes', header= T)
+
+benchSend12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-send', header = T)
+metricSend12nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-12nodes', header= T)
+
+benchSend16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-send', header = T)
+metricSend16nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-16nodes', header= T)
+
+benchRecv4nodes <-  read.csv('./data/onchain-1k/bench4nodes-1k-onchain-recv', header = T)
+metricRecv4nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-4nodes', header= T)
+
+benchRecv8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-recv', header = T)
+metricRecv8nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-8nodes', header= T)
+
+benchRecv12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-recv', header = T)
+metricRecv12nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-12nodes', header= T)
+
+benchRecv16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-recv', header = T)
+metricRecv16nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-16nodes', header= T)
+
+```
+
+# Grafico comparativo entre as latencias por grupo de nós.
+
+-   Avaliar se é necessario utilizar talvez algum outro tipo de grafico como em linha
+
+# Gráfico para envio:
+
+```{r}
+
+
+# length(benchSend4nodes$Latency)  # e.g., 1000
+# length(benchSend8nodes$Latency)  # e.g., 1000
+# length(benchSend12nodes$Latency) # e.g., 1000
+# length(benchSend16nodes$Latency) # e.g., 1000
+
+df_plotter <- data.frame(
+  time = rep(1:1000, times = 4),
+  latency = c(benchSend4nodes$Latency, benchSend8nodes$Latency, benchSend12nodes$Latency, benchSend16nodes$Latency),
+  scenario = rep(c("4 nós", "8 nós", "12 nós", "16 nós"), each = 1000)
+)
+
+df_plotter$scenario <- factor(df_plotter$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+df_plotter <- df_plotter %>%
+  mutate(case = "Envio")
+
+p <- ggplot(df_plotter, aes(x = time, y = latency)) + 
+  # geom_point() +
+  geom_line() +
+  facet_grid(rows = vars(scenario)) +
+  labs(title = "Inserção",
+      x = "Número de requisições",
+       y = "Latência (ms)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 150))
+
+print(p)
+# ggsave("send-nodes-latency-cmp.png")
+
+```
+
+# Gráfico para recuperação:
+
+```{r}
+
+
+# length(benchRecv4nodes$Latency)  # e.g., 1000
+# length(benchRecv8nodes$Latency)  # e.g., 1000
+# length(benchRecv12nodes$Latency) # e.g., 1000
+# length(benchRecv16nodes$Latency) # e.g., 1000
+
+
+df_plotter2 <- data.frame(
+  time = rep(1:1000, times = 4),
+  latency = c(benchRecv4nodes$Latency, benchRecv8nodes$Latency, benchRecv12nodes$Latency, benchRecv16nodes$Latency),
+  scenario = rep(c("4 nós", "8 nós", "12 nós", "16 nós"), each = 1000)
+)
+
+df_plotter2$scenario <- factor(df_plotter$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+df_plotter2 <- df_plotter2 %>%
+  mutate(case = "Recuperação")
+
+
+ggplot(df_plotter2, aes(x = time, y = latency)) +
+  # geom_point() +
+  geom_line() +
+  facet_grid(rows = vars(scenario)) +
+  labs(
+      title = "Recuperação",
+      x = "Número de requisições",
+       y = "Latência (ms)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 150))
+
+# ggsave('./recv-nodes-latency-cmp.png')
+
+```
+
+# Gráfico agrupado para onchain
+
+```{r}
+
+df_plotter1 <- df_plotter
+
+combined_df <- rbind(df_plotter1, df_plotter2)
+
+
+# Tentativa de fazer um gráfico agrupado
+
+p <- ggplot(combined_df, aes(x = time, y = latency)) +
+  # geom_point() +
+  geom_line() +
+  facet_grid(scenario ~ case) +
+  labs(x = "Número de requisições",
+       y = "Latência (ms)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 150))
+
+print(p)
+
+# ggsave('./figures/onchain-group-1k.png')
+
+```
+
+# Sem erros nos requests, apenas respondeCode 200 (OK)
+
+```{r}
+
+# Read: bs4n - bench send 4..16 nodes
+bs4n <- subset(benchSend4nodes, responseCode == 200)
+bs8n <- subset(benchSend8nodes, responseCode == 200)
+bs12n <- subset(benchSend12nodes, responseCode == 200)
+bs16n <- subset(benchSend16nodes, responseCode == 200)
+# Read: bs4n - bench recv 4..16 nodes
+br4n <- subset(benchRecv4nodes, responseCode == 200)
+br8n <- subset(benchRecv8nodes, responseCode == 200)
+br12n <- subset(benchRecv12nodes, responseCode == 200)
+br16n <- subset(benchRecv16nodes, responseCode == 200)
+
+
+min_rows <- min(
+  nrow(br4n), nrow(br8n),
+  nrow(br12n), nrow(br16n),
+  nrow(bs4n), nrow(bs8n),
+  nrow(bs12n), nrow(bs16n)
+)
+
+# Truncate all Latency columns to the minimum number of rows
+nbr4n <- br4n[1:min_rows, ]
+nbr8n <- br8n[1:min_rows, ]
+nbr12n <- br12n[1:min_rows, ]
+nbr16n <- br16n[1:min_rows, ]
+nbs4n <- bs4n[1:min_rows, ]
+nbs8n <- bs8n[1:min_rows, ]
+nbs12n <- bs12n[1:min_rows, ]
+nbs16n <- bs16n[1:min_rows, ]
+
+df_plotter1 <- data.frame(
+  time = rep(1:min_rows, times = 4),
+  latency = c(nbs4n$Latency, nbs8n$Latency, nbs12n$Latency, nbs16n$Latency),
+  scenario = rep(c("4 nós", "8 Nós", "12 nós", "16 nós"), each = min_rows),
+  case = rep("Envio", each = min_rows)
+)
+
+df_plotter1$scenario <- factor(df_plotter1$scenario, levels = c("4 nós", "8 Nós", "12 nós", "16 nós"))
+
+
+df_plotter2 <- data.frame(
+  time = rep(1:min_rows, times = 4),
+  latency = c(nbr4n$Latency, nbr8n$Latency, nbr12n$Latency, nbr16n$Latency),
+  scenario = rep(c("4 nós", "8 Nós", "12 nós", "16 nós"), each = min_rows),
+  case = rep("Recuperação", each = min_rows)
+)
+
+df_plotter2$scenario <- factor(df_plotter2$scenario, levels = c("4 nós", "8 Nós", "12 nós", "16 nós"))
+
+
+combined_df <- rbind(df_plotter1, df_plotter2)
+
+
+# Tentativa de fazer um gráfico agrupado
+
+p <- ggplot(combined_df, aes(x = time, y = latency)) +
+  # geom_point() +
+  geom_line() +
+  facet_grid(scenario ~ case) +
+  labs(x = "Número de requisições",
+       y = "Latência (ms)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 150))
+
+print(p)
+
+#ggsave('./figures/onchain-group-1k-cleaned.png')
+
+
+```
+
+# Gráfico para request/s realizados RECUPERAÇÃO;
+
+```{r}
+
+
+tpsbr4n <- getTps(br4n)
+tpsbr8n <- getTps(br8n)
+tpsbr12n <- getTps(br12n)
+tpsbr16n <- getTps(br16n)
+
+df_tps_recv_onchain <- data.frame(
+  tps = c(tpsbr4n$transactions, tpsbr8n$transactions, tpsbr12n$transactions, tpsbr16n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós", "16 nós"), time = c(length(tpsbr4n$transactions), length(tpsbr8n$transactions), length(tpsbr12n$transactions), length(tpsbr16n$transactions)))
+  )
+
+
+df_tps_recv_onchain$scenario <- factor(df_tps_recv_onchain$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+
+p <- ggplot(df_tps_recv_onchain, aes(x=tps, y=scenario)) + 
+    theme_bw()+
+    labs(x = "Transações por segundo (TPS).", y = "Número de nós da rede.") + 
+    geom_boxplot()
+
+print(p)
+
+```
+
+# Gráfico para request/s realizados INSERÇÃO (apenas requests com sucesso);
+
+```{r}
+
+# Read: bs4n - bench send 4..16 nodes
+bs4n <- subset(benchSend4nodes, responseCode == 200)
+bs8n <- subset(benchSend8nodes, responseCode == 200)
+bs12n <- subset(benchSend12nodes, responseCode == 200)
+bs16n <- subset(benchSend16nodes, responseCode == 200)
+# Read: bs4n - bench recv 4..16 nodes
+br4n <- subset(benchRecv4nodes, responseCode == 200)
+br8n <- subset(benchRecv8nodes, responseCode == 200)
+br12n <- subset(benchRecv12nodes, responseCode == 200)
+br16n <- subset(benchRecv16nodes, responseCode == 200)
+
+
+tpsbs4n <- getTps(bs4n)
+tpsbs8n <- getTps(bs8n)
+tpsbs12n <- getTps(bs12n)
+tpsbs16n <- getTps(bs16n)
+
+
+df_tps_send_onchain <- data.frame(
+  tps = c(tpsbs4n$transactions, tpsbs8n$transactions, tpsbs12n$transactions, tpsbs16n$transactions),
+  scenario = rep(c("4 nós", "8 nós", "12 nós", "16 nós"), time = c(length(tpsbs4n$transactions), length(tpsbs8n$transactions), length(tpsbs12n$transactions), length(tpsbs16n$transactions)))
+  )
+  
+df_tps_send_onchain$scenario <- factor(df_tps_send_onchain$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+merged_df <- rbind(df_tps_recv_onchain, df_tps_send_onchain)
+
+df_tps_send_onchain <- df_tps_send_onchain %>%
+  mutate(case = "Envio")
+
+df_tps_recv_onchain <- df_tps_recv_onchain %>%
+  mutate(case = "Recuperação")
+
+merged_df_onchain <- rbind(df_tps_recv_onchain, df_tps_send_onchain)
+
+ggplot(merged_df_onchain, aes(x = scenario, y = tps)) +
+  geom_boxplot() +
+  labs(x = "Número de nós na rede",
+       y = "Transações por segundo (TPS)") +
+  facet_grid(~case) + 
+  theme_bw() 
+
+ggsave('./figures/onchain-tps-grouped.png')
+
+
+```
+
+# Uso de CPU / ram / disco para ENVIO
+
+```{r}
+ams4n <- metricSend4nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams8n <- metricSend8nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+# Alguns problemas com undefined não sendo transformado em NA, força via as.integer
+metricSend12nodes$value <- as.integer(metricSend12nodes$value)
+
+ams12n <- metricSend12nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams16n <- metricSend16nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams4n <- getAvgOnchain(ams4n)
+ams8n <- getAvgOnchain(ams8n)
+ams12n <- getAvgOnchain(ams12n)
+ams16n <- getAvgOnchain(ams16n)
+
+ams4n <- ams4n %>%
+  mutate(scenario = "4 nós")
+ams8n <- ams8n %>%
+  mutate(scenario = "8 nós")
+ams12n <- ams12n %>%
+  mutate(scenario = "12 nós")
+ams16n <- ams16n %>%
+  mutate(scenario = "16 nós")
+
+df_metrics_send_join <- rbind(ams4n, ams8n, ams12n, ams16n)
+
+library(ggplot2)
+
+# Reorder levels of scenario
+df_metrics_send_join$scenario <- factor(df_metrics_send_join$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+# Plot for system_memory_used
+plot_memory <- ggplot(df_metrics_send_join[df_metrics_send_join$name == "system_memory_used", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "Memória (MB)", x = "") +
+  theme_bw()
+
+disk_data <- df_metrics_send_join %>%
+  filter(name %in% c("system_disk_readbytes", "system_disk_writebytes")) %>%
+  mutate(name = recode(name, 
+                       "system_disk_readbytes" = "Leitura", 
+                       "system_disk_writebytes" = "Escrita"))
+
+plot_disk_rw <- ggplot(disk_data, aes(x = scenario, y = avg_value, linetype = name)) +
+  geom_line(aes(group = name)) +
+  geom_point() +
+  labs(y = "Disco (MB)", linetype = "Metric", x = "") +
+  theme_bw() +
+  guides(linetype = guide_legend(title = NULL)) +
+  theme(legend.position = c(0.85, 0.2),
+        legend.key.size = unit(0.5, "cm"),
+        legend.background = element_rect(fill = "white", color = "black"))
+
+# Plot for system_cpu_sysload
+plot_cpu_sysload <- ggplot(df_metrics_send_join[df_metrics_send_join$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "CPU (%)", x = "") +
+  theme_bw()
+
+
+df_avg_tps_send_onchain <- df_tps_send_onchain %>%
+    group_by(scenario) %>%
+    summarise(avg_value = mean(tps, na.rm = TRUE))
+
+df_avg_tps_send_onchain <- df_avg_tps_send_onchain %>%
+    mutate(type = "send")
+
+plot_tps <- ggplot(df_avg_tps_send_onchain, aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  labs(y = "TPS", x = "") +
+  theme_bw()
+
+
+# Arrange plots
+library(gridExtra)
+g <- grid.arrange(plot_memory, plot_cpu_sysload, plot_disk_rw, plot_tps, nrow = 2, ncol = 2)
+
+#ggsave('./figures/onchain-review-metrics-send.png', g)
+
+```
+
+# Onchain metricas agrupadas send e recv
+
+```{r}
+
+amr4n <- metricRecv4nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr8n <- metricRecv8nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr12n <- metricRecv12nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr16n <- metricRecv16nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr4n <- getAvgOnchain(amr4n)
+amr8n <- getAvgOnchain(amr8n)
+amr12n <- getAvgOnchain(amr12n)
+amr16n <- getAvgOnchain(amr16n)
+
+amr4n <- amr4n %>%
+  mutate(scenario = "4 nós")
+amr8n <- amr8n %>%
+  mutate(scenario = "8 nós")
+amr12n <- amr12n %>%
+  mutate(scenario = "12 nós")
+amr16n <- amr16n %>%
+  mutate(scenario = "16 nós")
+
+df_metrics_recv_join <- rbind(amr4n, amr8n, amr12n, amr16n)
+df_metrics_recv_join$scenario <- factor(df_metrics_recv_join$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+df_avg_tps_recv_onchain <- df_tps_recv_onchain %>%
+    group_by(scenario) %>%
+    summarise(avg_value = mean(tps, na.rm = TRUE))
+
+df_avg_tps_recv_onchain <- df_avg_tps_recv_onchain %>%
+    mutate(type = "recv")
+
+df_metrics_recv_join <- df_metrics_recv_join %>%
+  mutate(type = "recv")
+
+df_metrics_send_join <- df_metrics_send_join %>%
+  mutate(type = "send")
+
+
+disk_data1 <- df_metrics_recv_join %>%
+  filter(name %in% c("system_disk_readbytes", "system_disk_writebytes")) %>%
+  mutate(name = recode(name, 
+                       "system_disk_readbytes" = "Leitura", 
+                       "system_disk_writebytes" = "Escrita"))
+
+plot_disk_rw1 <- ggplot(disk_data1, aes(x = scenario, y = avg_value, linetype = name)) +
+  geom_line(aes(group = name)) +
+  geom_point() +
+  labs(y = "Disco (MB)", linetype = "Metric", x = "") +
+  theme_bw() +
+  guides(linetype = guide_legend(title = NULL)) +
+  theme(legend.position = c(0.82, 0.8),
+        legend.key.size = unit(0.5, "cm"),
+        legend.background = element_rect(fill = "white", color = "black"))
+
+
+# Plot for system_memory_used
+plot_memory1 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_memory_used", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "Memória (MB)", x = "") +
+  theme_bw()
+
+# Plot for system_cpu_sysload
+plot_cpu_sysload1 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "CPU (%)", x = "") +
+  theme_bw()
+
+
+df_avg_tps_send_onchain <- df_tps_send_onchain %>%
+    group_by(scenario) %>%
+    summarise(avg_value = mean(tps, na.rm = TRUE))
+
+df_avg_tps_send_onchain <- df_avg_tps_send_onchain %>%
+    mutate(type = "send")
+
+plot_tps1 <- ggplot(df_avg_tps_recv_onchain, aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  labs(y = "TPS", x = "") +
+  theme_bw()
+
+
+# Arrange plots
+library(gridExtra)
+pp <- grid.arrange(plot_memory1, plot_cpu_sysload1, plot_disk_rw1, plot_tps1, nrow = 2, ncol = 2)
+
+# ggsave("./figures/onchain-review-metrics-recv.png", pp)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Quantidade de erros no envio e recuperação
+
+```{r}
+# Quantidade de erros nos requests, ou seja que não foram bem sucessidos (statusCode == 200)
+errors <- benchSend12nodes$responseCode[benchSend12nodes$responseCode != 200]
+length(errors) / length(benchSend12nodes$responseCode) * 100 # Porcentagem de erros em relação aos requests
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
