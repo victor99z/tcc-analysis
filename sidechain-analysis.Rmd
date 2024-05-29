@@ -25,26 +25,26 @@ source('./functions.R', local = knitr::knit_global())
 ```{r}
 
 benchSend4nodes <- read.csv('./data/sidechain-repl/bench4nodes-1k-sidechain-send', header = T)
-#metricSend4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes-full', header= T)
+metricSend4nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-4nodes-full', header= T)
 
 benchSend8nodes <- read.csv('./data/sidechain-repl/bench8nodes-1k-sidechain-send', header = T)
-#metricSend8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes-full', header= T)
+metricSend8nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-8nodes-full', header= T)
 
 benchSend12nodes <- read.csv('./data/sidechain-repl/bench12nodes-1k-sidechain-send', header = T)
-#metricSend12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes-full', header= T)
+metricSend12nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-12nodes-full', header= T)
 
 # ??? Cade esses DADOS MEU DEUS?
 # benchSend16nodes <- read.csv('./data/sidechain-repl/bench16nodes-1k-sidechain-send', header = T)
 # metricSend16nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-16nodes', header= T)
 
 benchRecv4nodes <-  read.csv('./data/sidechain-repl/bench4nodes-1k-sidechain-recv', header = T)
-#metricRecv4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes', header= T)
+metricRecv4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes-full', header= T)
 
 benchRecv8nodes <- read.csv('./data/sidechain-repl/bench8nodes-1k-sidechain-recv', header = T)
-#metricRecv8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes', header= T)
+metricRecv8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes-full', header= T)
 
 benchRecv12nodes <- read.csv('./data/sidechain-repl/bench12nodes-1k-sidechain-recv', header = T)
-#metricRecv12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes', header= T)
+metricRecv12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes-full', header= T)
 
 #benchRecv16nodes <- read.csv('./data/sidechain-repl/bench16nodes-1k-sidechain-recv', header = T)
 #metricRecv16nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-16nodes', header= T)
@@ -117,7 +117,7 @@ df_tps_send_sidechain <- data.frame(
   )
   
 df_tps_send_sidechain$scenario <- factor(df_tps_send_sidechain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
-
+df_tps_recv_sidechain$scenario <- factor(df_tps_recv_sidechain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
 
 
 df_tps_send_sidechain <- df_tps_send_sidechain %>%
@@ -137,7 +137,8 @@ p <- ggplot(merged_df_sidechain, aes(x = scenario, y = tps)) +
   facet_grid(~case) + 
   theme_bw() 
 
-# ggsave('./figures/sidechain-tps-grouped.png')
+print(p)
+# ggsave('./figures/sidechain-tps-grouped.png', p)
 
 ```
 
@@ -217,22 +218,179 @@ ggplot(merged, aes(x = scenario, y = tps)) +
   facet_grid(case ~ network) +
   theme_bw()
 
-# onchain.tpsbr4n
-# xValue <- seq(1,length(onchain.br4n), 1)
-# yValue <- tpsbr4n
-# data <- data.frame(xValue,yValue)
-
-# Plot
-ggplot(onchain.tpsbr4n, aes(x=second, y=transactions)) +
-  geom_line()
-
 # ggsave('./figures/sidechain-vs-onchain-boxplot.png')
 
 ```
 
-# Teste gráfico de linhas agrupado
+# Uso de CPU / RAM / DISCO para sidechain
 
 ```{r}
+
+ams4n <- metricSend4nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams8n <- metricSend8nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams12n <- metricSend12nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+ams4n <- getAvgOnchain(ams4n)
+ams8n <- getAvgOnchain(ams8n)
+ams12n <- getAvgOnchain(ams12n)
+
+ams4n <- ams4n %>%
+  mutate(scenario = "4 nós")
+ams8n <- ams8n %>%
+  mutate(scenario = "8 nós")
+ams12n <- ams12n %>%
+  mutate(scenario = "12 nós")
+
+df_metrics_send_join <- rbind(ams4n, ams8n, ams12n)
+
+library(ggplot2)
+
+# Reorder levels of scenario
+df_metrics_send_join$scenario <- factor(df_metrics_send_join$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+# Plot for system_memory_used
+plot_memory <- ggplot(df_metrics_send_join[df_metrics_send_join$name == "system_memory_used", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "Memória (MB)", x = "") +
+  theme_bw()
+
+disk_data <- df_metrics_send_join %>%
+  filter(name %in% c("system_disk_readbytes", "system_disk_writebytes")) %>%
+  mutate(name = recode(name, 
+                       "system_disk_readbytes" = "Leitura", 
+                       "system_disk_writebytes" = "Escrita"))
+
+plot_disk_rw <- ggplot(disk_data, aes(x = scenario, y = avg_value, linetype = name)) +
+  geom_line(aes(group = name)) +
+  geom_point() +
+  labs(y = "Disco (MB)", linetype = "Metric", x = "") +
+  theme_bw() +
+  guides(linetype = guide_legend(title = NULL)) +
+  theme(legend.position = c(0.15, 0.8),
+        legend.key.size = unit(0.5, "cm"),
+        legend.background = element_rect(fill = "white", color = "black"))
+
+# Plot for system_cpu_sysload
+plot_cpu_sysload <- ggplot(df_metrics_send_join[df_metrics_send_join$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "CPU (%)", x = "") +
+  theme_bw()
+
+
+df_avg_tps_send_sidechain <- df_tps_send_sidechain %>%
+    group_by(scenario) %>%
+    summarise(avg_value = mean(tps, na.rm = TRUE))
+
+df_avg_tps_send_sidechain <- df_avg_tps_send_sidechain %>%
+    mutate(type = "send")
+
+plot_tps <- ggplot(df_avg_tps_send_sidechain, aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  labs(y = "TPS", x = "") +
+  theme_bw()
+
+
+# Arrange plots
+library(gridExtra)
+g <- grid.arrange(plot_memory, plot_cpu_sysload, plot_disk_rw, plot_tps, nrow = 2, ncol = 2)
+
+# ggsave('./figures/sidechain-review-metrics-send.png', g)
+
+```
+
+```{r}
+
+amr4n <- metricRecv4nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr8n <- metricRecv8nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr12n <- metricRecv12nodes %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+amr4n <- getAvgOnchain(amr4n)
+amr8n <- getAvgOnchain(amr8n)
+amr12n <- getAvgOnchain(amr12n)
+
+amr4n <- amr4n %>%
+  mutate(scenario = "4 nós")
+amr8n <- amr8n %>%
+  mutate(scenario = "8 nós")
+amr12n <- amr12n %>%
+  mutate(scenario = "12 nós")
+
+df_metrics_recv_join <- rbind(amr4n, amr8n, amr12n)
+df_metrics_recv_join$scenario <- factor(df_metrics_recv_join$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+df_avg_tps_recv_sidechain <- df_tps_recv_sidechain %>%
+    group_by(scenario) %>%
+    summarise(avg_value = mean(tps, na.rm = TRUE))
+
+df_avg_tps_recv_sidechain <- df_avg_tps_recv_sidechain %>%
+    mutate(type = "recv")
+
+df_metrics_recv_join <- df_metrics_recv_join %>%
+  mutate(type = "recv")
+
+disk_data2 <- df_metrics_recv_join %>%
+  filter(name %in% c("system_disk_readbytes", "system_disk_writebytes")) %>%
+  mutate(name = recode(name, 
+                       "system_disk_readbytes" = "Leitura", 
+                       "system_disk_writebytes" = "Escrita"))
+
+plot_disk_rw2 <- ggplot(disk_data2, aes(x = scenario, y = avg_value, linetype = name)) +
+  geom_line(aes(group = name)) +
+  geom_point() +
+  labs(y = "Disco (MB)", linetype = "Metric", x = "") +
+  theme_bw() +
+  guides(linetype = guide_legend(title = NULL)) +
+  theme(legend.position = c(0.15, 0.8),
+        legend.key.size = unit(0.5, "cm"),
+        legend.background = element_rect(fill = "white", color = "black"))
+
+
+# Plot for system_memory_used
+plot_memory2 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_memory_used", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "Memória (MB)", x = "") +
+  theme_bw()
+
+# Plot for system_cpu_sysload
+plot_cpu_sysload2 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = name)) +
+  geom_point(size = 2) +
+  labs(y = "CPU (%)", x = "") +
+  theme_bw()
+
+
+plot_tps2 <- ggplot(df_avg_tps_recv_sidechain, aes(x = scenario, y = avg_value)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  labs(y = "TPS", x = "") +
+  theme_bw()
+
+
+# Arrange plots
+library(gridExtra)
+pp <- grid.arrange(plot_memory2, plot_cpu_sysload2, plot_disk_rw2, plot_tps2, nrow = 2, ncol = 2)
+
+ggsave('./figures/sidechain-review-metrics-recv.png', pp)
 
 ```
 
