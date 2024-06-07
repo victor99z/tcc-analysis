@@ -1,0 +1,124 @@
+---
+title: "50k-onchain-sidechain"
+author: "Victor Bernardes"
+date: "2024-06-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(patchwork)
+library(gridExtra)
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+# Sidechain
+
+
+
+sidechain.benchSend8nodes <- read.csv('./data/sidechain-50k/bench8nodes-50k-sidechain-send', header= T)
+sidechain.metricSend8nodes <- read.csv('./data/sidechain-50k/metric-send-50k-sidechain-8nodes', header= T)
+sidechain.benchRecv8nodes <- read.csv('./data/sidechain-50k/bench8nodes-50k-sidechain-recv', header= T)
+sidechain.metricRecv8nodes <- read.csv('./data/sidechain-50k/metric-recv-50k-sidechain-8nodes', header= T)
+
+
+sidechain.benchSend12nodes <- read.csv('./data/sidechain-50k/bench12nodes-50k-sidechain-send', header= T)
+sidechain.metricSend12nodes <- read.csv('./data/sidechain-50k/metric-send-50k-sidechain-12nodes', header= T)
+sidechain.benchRecv12nodes <- read.csv('./data/sidechain-50k/bench12nodes-50k-sidechain-recv', header= T)
+sidechain.metricRecv12nodes <- read.csv('./data/sidechain-50k/metric-recv-50k-sidechain-12nodes', header= T)
+
+
+# Onchain
+
+onchain.benchSend8nodes <- read.csv('./data/onchain-50k/bench8nodes-50k-onchain-send', header= T)
+onchain.metricSend8nodes <- read.csv('./data/onchain-50k/metric-send-50k-onchain-8nodes', header= T)
+
+onchain.benchSend12nodes <- read.csv('./data/onchain-50k/bench12nodes-50k-onchain-send', header= T)
+onchain.metricSend12nodes <- read.csv('./data/onchain-50k/metric-send-50k-onchain-12nodes', header= T)
+
+```
+
+# Latências e transações por segundo (sidechain)
+
+```{r}
+
+# sidechain.benchSend8nodes
+# sidechain.benchRecv8nodes
+# sidechain.benchSend12nodes
+# sidechain.benchRecv12nodes
+
+
+side.benchSend8nodes = subset(sidechain.benchSend8nodes, responseCode == 200)
+side.benchSend12nodes = subset(sidechain.benchSend12nodes, responseCode == 200)
+on.benchSend8nodes = subset(onchain.benchSend8nodes, responseCode == 200)
+on.benchSend12nodes = subset(onchain.benchSend12nodes, responseCode == 200)
+
+# on.benchSend8nodes = subset(on.benchSend8nodes, Latency < 2500)
+# on.benchSend12nodes = subset(on.benchSend12nodes, Latency < 2500)
+
+min_obs <- min(c(length(side.benchSend8nodes$Latency), length(side.benchSend12nodes$Latency)))
+
+df_sidechain <- data.frame(
+  latencia = side.benchSend12nodes$Latency,
+  nodes = rep(12, each = min_obs),
+  system = rep("sidechain", each = min_obs),
+  idx = seq(1, min_obs)
+)
+
+df_onchain <- data.frame(
+  latencia = on.benchSend12nodes$Latency,
+  nodes = rep(12, each = length(on.benchSend12nodes$Latency)),
+  system = rep("onchain", each = length(on.benchSend12nodes$Latency)),
+  idx = seq(1, length(on.benchSend12nodes$Latency))
+)
+
+merge_df <- rbind(df_onchain, df_sidechain)
+
+merge_df <- merge_df %>% filter(latencia < 350)
+
+summary(df_onchain$latencia[df_onchain$latencia < 350])
+sd(df_onchain$latencia[df_onchain$latencia < 350])
+summary(df_sidechain$latencia[df_sidechain$latencia < 350])
+sd(df_sidechain$latencia[df_sidechain$latencia < 350])
+length(on.benchSend12nodes$Latency)
+
+quantile(df_onchain$latencia, 0.99)
+quantile(df_sidechain$latencia, 0.99)
+
+ggplot(merge_df, aes(x = nodes, y = latencia, group = nodes)) +
+  geom_boxplot() +
+  labs(x = "Número de nós na rede",
+       y = "Latência (ms)") +
+  facet_wrap(~ system ) +
+  theme_bw()
+
+p <- ggplot(merge_df, aes(x = idx, y = latencia)) + 
+  # geom_point() +
+  geom_line() +
+  facet_wrap( ~ system) +
+  labs(x = "Número de requisições",
+       y = "Latência (ms)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 400))
+
+print(p)
+
+# ggsave('./figures/50k-latencia-dispersao.png', p)
+
+```
+
+
+```{r}
+
+
+
+onchain.benchSend8nodes
+onchain.benchSend12nodes
+
+```
+

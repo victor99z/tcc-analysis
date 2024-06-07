@@ -1,0 +1,161 @@
+---
+title: "replicação-analises"
+author: "Victor Bernardes"
+date: "2024-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+library(dplyr)
+library(readr)
+library(purrr)
+library(lubridate)
+library(ggplot2)
+library(stringr)
+
+
+# Defina o caminho do diretório
+dir_path <- "./data/sidechain-repl"
+
+# Listar arquivos que correspondem ao padrão especificado
+all_bench <- list.files(path = dir_path, pattern = "bench(4|8|12|16)nodes-1k-sidechain-(recv|send)-repl-", full.names = TRUE)
+
+all_bench
+
+extract_info <- function(file_name) {
+  nodes <- str_extract(file_name, "bench(4|8|12|16)nodes") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)") 
+  data <- read_csv(file_name, show_col_types = FALSE)
+
+  filtered_files <- file_name[str_detect(file_name, "-repl-(\\d+)-(\\d+)$")]
+
+  # Extrair os números finais dos caminhos dos arquivos
+  repl_numbers <- str_match(filtered_files, "-repl-(\\d+)-(\\d+)$")
+    
+  repl_min <- as.integer(repl_numbers[, 2])
+  repl_max <- as.integer(repl_numbers[, 3])
+  
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           label = method,
+           file = file_name,
+           repl_min = repl_min,
+           repl_max = repl_max
+           )
+  return(data)
+}
+
+bench_list <- map(all_bench, extract_info)
+
+bench_list <- bind_rows(bench_list)
+
+bench_filtered <- bench_list %>%
+  filter(repl_min == repl_max, Latency < 250)
+
+
+qt <- ggplot(bench_filtered, aes(x = nodes, y = Latency, group =  label)) +
+  geom_boxplot() +
+  labs(x = "", y = "Latência (ms)") +
+  facet_grid( nodes ~ label, scales = "free", labeller = labeller(label = c(send = "Envio", recv = "Recuperação"))) +
+  coord_flip() + 
+  theme_bw()
+
+print(qt)
+
+# 
+# ggsave('./figures/repl-boxplot.png', qt)
+
+
+# Quase foi 
+
+# filter <- bench_filtered %>%
+#   filter(nodes == 12, label == "recv")
+# 
+# re <- getTps(filter)
+# mean(re$transactions, na.rm = T)
+# 
+# 
+# filter1 <- filter %>%
+#   group_by(nodes, label) %>%
+#   summarise(avg_tps = mean(mean_latency$transactions, na.rm = TRUE, .groups = 'drop'))
+# 
+# 
+# filter3 <- filter %>%
+#   filter(nodes == 4, label == "send") %>%
+#   summarise(avg =  mean(.$mean_latency, na.rm = TRUE))
+# 
+# 
+# 
+# View(filter1)
+
+
+
+
+#
+# Check the structure of getTps output
+example_output <- getTps(bench_filtered)
+print(example_output)
+
+# Step 1: Apply getTps function and group by nodes and label
+filter <- bench_filtered %>%
+  group_by(nodes, label) %>%
+  summarise(mean_latency = list(getTps(cur_data())), .groups = 'drop')
+
+# Check the intermediate result
+print(filter)
+
+# Step 2: Unnest the list column mean_latency
+unnested_filter <- filter %>%
+  unnest(mean_latency)
+
+# Check the intermediate result
+print(unnested_filter)
+
+# Step 3: Group by nodes and label again, and calculate avg_tps
+filter1 <- unnested_filter %>%
+  group_by(nodes, label) %>%
+  summarise(avg_tps = mean(transactions, na.rm = TRUE), .groups = 'drop')
+
+# Check the final result
+print(filter1)
+
+filter1$nodes <- factor(filter1$nodes, levels = c(4, 8, 12, 16), labels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
+filter1$label <- factor(filter1$label, levels = c("recv", "send"), labels = c("Recuperação", "Envio"))
+
+
+ppp <- ggplot(filter1, aes(x = nodes, y = avg_tps, fill = label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Nós da rede", y = "Transações por segundo", fill = "label") +
+  theme_bw(base_size = 14) +
+  theme(legend.title = element_blank()) +
+  scale_fill_grey()
+
+
+ggsave('./figures/repl-barra-tps.png',ppp)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

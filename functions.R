@@ -14,11 +14,43 @@ getTps <- function(data) {
   return(tps)
 }
 
+
+
 getAvgOnchain <- function(data) {
+  
   data <- data %>%
-    mutate(avg_value = ifelse(name == "system_memory_used" , avg_value / (1024 * 1024), avg_value)) %>%
+    group_by(name) %>%
+    summarise(avg_value = mean(value, na.rm = TRUE))
+  
+  data <- data %>%
+    mutate(avg_value = ifelse(name == "system_memory_used", avg_value / (1024 * 1024), avg_value)) %>%
     mutate(avg_value = ifelse(name == "system_disk_readbytes" , avg_value / (1024 * 1024), avg_value)) %>%
     mutate(avg_value = ifelse(name == "system_disk_writebytes" , avg_value / (1024 * 1024), avg_value)) %>%
     mutate(avg_value = ifelse(name == "system_cpu_sysload" , avg_value / 100, avg_value))
+  return(data)
+}
+
+getAvgSidechain <- function(data) {
+
+  
+  data <- data %>%
+    filter(name %in% c("system_memory_used", "system_cpu_sysload", 
+                       "process_cpu_seconds_total", "process_resident_memory_bytes"))
+  data <- data %>%
+    group_by(name) %>%
+    summarise(avg_value = mean(value, na.rm = TRUE))
+  
+  data <- data %>%
+    mutate(avg_value = ifelse(name == "system_memory_used", avg_value / (1024 * 1024), avg_value)) %>%
+    mutate(avg_value = ifelse(name == "system_cpu_sysload" , avg_value / 100, avg_value)) %>%
+    mutate(avg_value = ifelse(name == "process_cpu_seconds_total" , avg_value, avg_value)) %>% # IPFS
+    mutate(avg_value = ifelse(name == "process_resident_memory_bytes" , avg_value, avg_value)) # IPFS
+  
+  # data <- data %>%
+  #   mutate(cpu = sum(name == "system_cpu_sysload", name == "process_cpu_seconds_total"),
+  #          ram = sum(name == "system_memory_used", name == "process_resident_memory_bytes"))
+  # 
+  
+  
   return(data)
 }

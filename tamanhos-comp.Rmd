@@ -1,0 +1,196 @@
+---
+title: "tamanhos-comp"
+author: "Victor Bernardes"
+date: "2024-06-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+# library(patchwork)
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+library(dplyr)
+library(readr)
+library(purrr)
+library(ggplot2)
+library(stringr)
+
+# Defina o caminho do diretório
+dir_path <- "./data/tamanhos"
+
+# Listar arquivos que correspondem ao padrão especificado
+all_files <- list.files(path = dir_path, pattern = "bench(8|16)nodes-(1mb|10mb|100mb)-sidechain-(send|recv)", full.names = TRUE)
+
+# Ler os arquivos CSV
+data_list <- all_files %>% map(~ read_csv(.))
+
+```
+
+
+# Métricas recuperadas para os casos 
+
+# blockchain metrics
+- process_cpu_seconds_total
+- process_resident_memory_bytes
+
+## ipfs metrics
+- system_cpu_sysload
+- system_memory_used
+
+
+```{r}
+
+all_metrics <- list.files(path = dir_path, pattern = "metrics-(recv|send)-(1mb|10mb|100mb)-(8|16)node-full", full.names = TRUE)
+
+# metrics <- all_metrics %>% map(~ read_csv(., show_col_types = FALSE))
+
+extract_metric <- function(file_name) {
+  nodes <- str_extract(file_name, "(8|16)node-full") %>% str_extract("\\d+")
+  size <- str_extract(file_name, "(1mb|10mb|100mb)") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)") 
+  size <- paste0(size, "MB")
+  data <- read_csv(file_name, show_col_types = FALSE)
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           size = size,
+           label = method)
+  return(data)
+}
+
+metrics <- map(all_metrics, extract_metric)
+
+combined_metrics <- bind_rows(metrics)
+
+```
+
+```{r}
+
+
+
+avg_mem <- combined_metrics %>%
+  filter(label == "recv", nodes == 16, size == "1MB") %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE)) %>%
+  filter(name %in% c('system_memory_used', 'process_resident_memory_bytes'))
+
+avg_cpu <- combined_metrics %>%
+  filter(label == "recv", nodes == 16, size == "1MB") %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE)) %>%
+  filter(name %in% c('process_cpu_seconds_total', 'system_cpu_sysload'))
+
+c_ipfs <- avg_cpu$avg_value[1]
+c_block <- avg_cpu$avg_value[2] / 10
+round(sum(c_block, c_ipfs),2)
+
+round(sum(avg_mem$avg_value[1], avg_mem$avg_value[2]) / (1024 * 1024), 2)
+
+
+```
+
+
+
+
+# Leia os arquivos no diretorio './data/tamanhos' e crie os graficos de dispersão usango ggplot para os benchmarks "bench" de 1mb, 10mb e 100mb, os arquivos inicial com a palavra bench
+
+```{r}
+# Carregar bibliotecas necessárias
+
+# dir <- "./data/tamanhos/"
+# 
+# recv8 <- list.files(dir, "bench8nodes-(1mb|10mb|100mb)-sidechain-recv" ,full.names = TRUE)
+# send8 <- list.files(dir, "bench16nodes-(1mb|10mb|100mb)-sidechain-send" ,full.names = TRUE)
+# recv16 <- list.files(dir, "bench16nodes-(1mb|10mb|100mb)-sidechain-recv" ,full.names = TRUE)
+# send16 <- list.files(dir, "bench16nodes-(1mb|10mb|100mb)-sidechain-send" ,full.names = TRUE)
+# 
+# # Ler todos os arquivos e adiciona uma coluna com o numero de nos (para uso posterior na plotagem) e o tamanho de arquivo testado (1mb, 10mb ou 100mb) 
+# 
+# recv8 <- recv8 %>% map(~read_csv(.))
+# send8 <- send8 %>% map(~read_csv(.))
+# recv16 <- recv16 %>% map(~read_csv(.))
+# send16 <- send16 %>% map(~read_csv(.))
+# 
+# all <- list.files(dir, "bench(8|16)nodes-(1mb|10mb|100mb)-sidechain-(send|recv)" ,full.names = TRUE)
+# 
+# all <- all %>% map(~read_csv(.))
+# 
+# # Adicionar uma coluna para o numero de nos e o tamanho do arquivo
+# recv8 <- recv8 %>% map(~mutate(., nodes = 8, size = str_extract(file_path, "(1mb|10mb|100mb)")))
+# send8 <- send8 %>% map(~mutate(., nodes = 8, size = str_extract(file_path, "(1mb|10mb|100mb)")))
+# recv16 <- recv16 %>% map(~mutate(., nodes = 16, size = str_extract(file_path, "(1mb|10mb|100mb)")))
+# send16 <- send16 %>% map(~mutate(., nodes = 16, size = str_extract(file_path, "(1mb|10mb|100mb)")))
+# 
+# 
+# # Combinar todos os dataframes em um
+# data <- bind_rows(data_list)
+
+
+
+# Função para extrair o número de nós e o tamanho do arquivo do nome do arquivo
+extract_info <- function(file_name) {
+  nodes <- str_extract(file_name, "bench(8|16)nodes") %>% str_extract("\\d+")
+  size <- str_extract(file_name, "(1mb|10mb|100mb)") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)") 
+  size <- paste0(size, "MB")
+  data <- read_csv(file_name)
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           size = size,
+           label = method)
+  return(data)
+}
+
+# Aplicar a função a todos os arquivos
+data_list <- map(all_files, extract_info)
+
+# Combinar todos os data frames em um único data frame
+combined_data <- bind_rows(data_list)
+
+# Filtrar os dados de requisições
+combined_data8 <- combined_data %>%
+  filter(label %in% "send", responseCode == 200, nodes == 8, size == "100MB")
+
+combined_data16 <- combined_data %>%
+  filter(label %in% "send", responseCode == 200, nodes == 16, size == "100MB")
+
+summary(combined_data8$Latency)
+round(sd(combined_data8$Latency), 2)
+quantile(combined_data8$Latency, 0.99)
+
+summary(combined_data16$Latency)
+round(sd(combined_data16$Latency), 2)
+quantile(combined_data16$Latency, 0.99)
+
+plot(combined_data16$Latency)
+
+# anova_result <- aov(Latency ~ nodes, data = rbind(combined_data8, combined_data16))
+# 
+# # Summary of ANOVA
+# summary(anova_result)
+
+# tps <- getTps(combined_data)
+# tps <- mean(tps$transactions)
+# tps
+#   
+# 
+# # Criar gráfico de dispersão
+# p <- ggplot(combined_data, aes(x = factor(nodes), y = Latency)) +
+#   geom_point() +
+#   facet_wrap(~ size) +
+#   labs(x = "Nós na rede",
+#        y = "Latência (ms)",
+#        color = "Número de nós") +
+#   theme_bw()
+# 
+# print(p)
+
+# ggsave('./figures/tamanhos-boxplot-recv.png', p)
+
+```

@@ -1,0 +1,329 @@
+---
+title: "onchain-vs-sidechain-metrics"
+author: "Victor Bernardes"
+date: "2024-05-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(patchwork)
+library(gridExtra)
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+# Sidechain
+
+metricSend4nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-4nodes-full', header= T)
+metricSend8nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-8nodes-full', header= T)
+metricSend12nodes <- read.csv('./data/sidechain-repl/metric-send-1k-sidechain-12nodes-full', header= T)
+
+metricRecv4nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-4nodes-full', header= T)
+metricRecv8nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-8nodes-full', header= T)
+metricRecv12nodes <- read.csv('./data/sidechain-repl/metric-recv-1k-sidechain-12nodes-full', header= T)
+
+# Onchain
+
+onchain.metricSend4nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-4nodes', header= T)
+onchain.metricSend8nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-8nodes', header= T)
+onchain.metricSend12nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-12nodes', header= T)
+onchain.metricSend16nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-16nodes', header= T)
+
+onchain.metricRecv4nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-4nodes', header= T)
+onchain.metricRecv8nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-8nodes', header= T)
+onchain.metricRecv12nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-12nodes', header= T)
+onchain.metricRecv16nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-16nodes', header= T)
+
+
+```
+
+# Análise exploratorio dos dados de CPU
+
+```{r}
+
+side_ms4n <- getAvgSidechain(metricSend4nodes);
+on_ms4n <- getAvgSidechain(onchain.metricSend4nodes);
+
+total = side_ms4n$avg_value[side_ms4n$name == 'system_cpu_sysload'] + side_ms4n$avg_value[side_ms4n$name == 'process_cpu_seconds_total'] 
+
+par(mfrow = c(1,2))
+plot(metricSend4nodes$value[metricSend4nodes$name == 'system_cpu_sysload'] / 100)
+plot(onchain.metricSend4nodes$value[onchain.metricSend4nodes$name == 'system_cpu_sysload'] / 100)
+
+
+par(mfrow = c(1,2))
+plot(metricSend4nodes$value[metricSend4nodes$name == 'process_cpu_seconds_total'])
+plot(metricSend4nodes$value[metricSend4nodes$name == 'system_cpu_sysload'] / 100)
+
+
+
+```
+# Dados agrupados para sidechain vs onchain, CPU e RAM
+
+```{r}
+
+side_ms4n <- getAvgSidechain(metricSend4nodes)
+side_ms8n <- getAvgSidechain(metricSend8nodes)
+side_ms12n <- getAvgSidechain(metricSend12nodes)
+side_mr4n <- getAvgSidechain(metricRecv4nodes)
+side_mr8n <- getAvgSidechain(metricRecv8nodes)
+side_mr12n <- getAvgSidechain(metricRecv12nodes)
+
+side_ms4n <- side_ms4n %>%
+  mutate(scenario = "4 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "sidechain")
+
+side_ms8n <- side_ms8n %>%
+  mutate(scenario = "8 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "sidechain")
+
+side_ms12n <- side_ms12n %>%
+  mutate(scenario = "12 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "sidechain")
+
+side_mr4n <- side_mr4n %>%
+  mutate(scenario = "4 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "sidechain")
+
+
+side_mr8n <- side_mr8n %>%
+  mutate(scenario = "8 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "sidechain")
+
+side_mr12n <- side_mr12n %>%
+  mutate(scenario = "12 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "sidechain")
+
+
+df_merge_recv <- rbind(side_mr4n, side_mr8n, side_mr12n)
+df_merge_send <- rbind(side_ms4n, side_ms8n, side_ms12n)
+
+
+df_merge_sidechain <- rbind(df_merge_send, df_merge_recv)
+
+df_merge_sidechain$scenario <- factor(df_merge_sidechain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+# system = sidechain ou onchain
+# type = Recuperação ou Envio
+# name = nome da métrica ...
+
+summarized_df_sidechain <- df_merge_sidechain %>%
+    mutate(
+    name = ifelse(name %in% c("process_cpu_seconds_total", "system_cpu_sysload"), "CPU (%)", "RAM (MB)"),
+    value = avg_value,
+    system = "sidechain"
+  ) %>%
+  group_by(scenario, type, name, system) %>%
+  summarise(
+    total_value = sum(value),
+    .groups = 'drop'
+  )
+
+ggplot(summarized_df_sidechain, aes(x = scenario, y = total_value, linetype = type)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  # labs(y = "CPU (%)", x = "") +
+  facet_grid( name ~ system, scale = "free_y") + 
+  theme_bw() + 
+  guides(linetype = guide_legend(title = NULL)) + 
+  theme(legend.position = "bottom", legend.key.size = unit(0.5, "cm"),)
+
+```
+
+```{r}
+
+onchain.metricSend12nodes$value <- as.integer(onchain.metricSend12nodes$value)
+
+on_ms4n <- getAvgSidechain(onchain.metricSend4nodes)
+on_ms8n <- getAvgSidechain(onchain.metricSend8nodes)
+on_ms12n <- getAvgSidechain(onchain.metricSend12nodes)
+on_mr4n <- getAvgSidechain(onchain.metricRecv4nodes)
+on_mr8n <- getAvgSidechain(onchain.metricRecv8nodes)
+on_mr12n <- getAvgSidechain(onchain.metricRecv12nodes)
+
+on_ms4n <- on_ms4n %>%
+  mutate(scenario = "4 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "onchain")
+
+on_ms8n <- on_ms8n %>%
+  mutate(scenario = "8 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "onchain")
+
+on_ms12n <- on_ms12n %>%
+  mutate(scenario = "12 nós") %>%
+  mutate(type = "Envio") %>%
+  mutate(system = "onchain")
+
+on_mr4n <- on_mr4n %>%
+  mutate(scenario = "4 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "onchain")
+
+
+on_mr8n <- on_mr8n %>%
+  mutate(scenario = "8 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "onchain")
+
+on_mr12n <- on_mr12n %>%
+  mutate(scenario = "12 nós") %>%
+  mutate(type = "Recuperação") %>%
+  mutate(system = "onchain")
+
+on_df_merge_recv <- rbind(on_mr4n, on_mr8n, on_mr12n)
+o_df_merge_send <- rbind(on_ms4n, on_ms8n, on_ms12n)
+
+
+df_merge_onchain <- rbind(o_df_merge_send, on_df_merge_recv)
+
+df_merge_onchain$scenario <- factor(df_merge_onchain$scenario, levels = c("4 nós", "8 nós", "12 nós"))
+
+# system = sidechain ou onchain
+# type = Recuperação ou Envio
+# name = nome da métrica ...
+
+summarized_df_onchain <- df_merge_onchain %>%
+    mutate(
+    name = ifelse(name %in% c("system_cpu_sysload"), "CPU (%)", "RAM (MB)"),
+    value = avg_value,
+    system = "onchain"
+  ) %>%
+  group_by(scenario, type, name, system) %>%
+  summarise(
+    total_value = sum(value),
+    .groups = 'drop'
+  )
+
+ppp23213 <- rbind(summarized_df_onchain, summarized_df_sidechain)
+
+p12323 <-ggplot(ppp23213, aes(x = scenario, y = total_value, linetype = type)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  labs(y = "", x = "") +
+  facet_grid( name ~ system, scale = "free_y") + 
+  theme_bw() + 
+  guides(linetype = guide_legend(title = NULL)) + 
+  theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
+
+print(p12323)
+
+# ggsave('./figures/sidechain-onchain-metrics.png', p12323)
+
+```
+
+
+
+```{r}
+
+library(dplyr)
+library(readr)
+library(purrr)
+library(ggplot2)
+library(stringr)
+
+dir_path <- "./data/onchain-1k/"
+
+all_metrics_onchain <- list.files(path = dir_path, pattern = "metric-(send|recv)-1k-onchain-(4|8|12|16)nodes", full.names = TRUE)
+
+all_metrics_sidechain <- list.files(path = "./data/sidechain-repl/", pattern = "metric-(send|recv)-1k-sidechain-(4|8|12|16)nodes-full", full.names = TRUE)
+
+
+extract_metric <- function(file_name) {
+  nodes <- str_extract(file_name, "(4|8|12|16)nodes") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)")
+  data <- read_csv(file_name, show_col_types = FALSE)
+  system <- str_extract(file_name, "(onchain|sidechain)")
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           system = system,
+           label = method,
+           value = as.numeric(value))
+  return(data)
+}
+
+
+metrics2222 <- map(all_metrics_onchain, extract_metric)
+metrics3333 <- map(all_metrics_sidechain, extract_metric)
+
+metric_all_onchain <- bind_rows(metrics2222)
+metric_all_sidechain <- bind_rows(metrics3333)
+
+
+avg_mem_onchain <- metric_all_onchain %>%
+  group_by(name, nodes, label) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE) / (1024 * 1024)) %>%
+  filter(name %in% c('system_memory_used'))  %>%
+  mutate(name = "RAM (MB)", system = "onchain")
+
+avg_cpu_onchain <- metric_all_onchain %>%
+  group_by(name, nodes, label) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE) / 10) %>%
+  filter(name %in% c('system_cpu_sysload')) %>%
+  mutate(name = "CPU (%)", system = "onchain")
+
+
+avg_mem_sidechain <- metric_all_sidechain %>%
+  group_by(name, nodes, label) %>%
+  filter(name %in% c('system_memory_used', 'process_resident_memory_bytes')) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE) / (1024 * 1024)) %>%
+  mutate(name = "RAM (MB)", system = "sidechain")
+
+avg_mem_sidechain <- avg_mem_sidechain %>%
+  group_by(nodes, label) %>%
+  summarise(avg_value = sum(avg_value)) %>%
+  mutate(name = "RAM (MB)", system = "sidechain")
+
+avg_cpu_sidechain <- metric_all_sidechain %>%
+  group_by(name, nodes, label) %>%
+  filter(name %in% c('process_cpu_seconds_total', 'system_cpu_sysload'))  %>%
+  mutate(value = ifelse(name == "system_cpu_sysload", value / 10, value)) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE))
+
+avg_cpu_sidechain <- avg_cpu_sidechain %>%
+  group_by(nodes, label) %>%
+  summarise(avg_value = sum(avg_value)) %>%
+  mutate(name = "CPU (%)", system = "sidechain")
+
+all_sidechain <- bind_rows(avg_mem_sidechain, avg_cpu_sidechain)
+all_onchain <- bind_rows(avg_mem_onchain, avg_cpu_onchain)
+
+gg <- bind_rows(all_sidechain, all_onchain)
+
+fixed <- ggplot(gg, aes(x = nodes, y = avg_value, linetype = label)) +
+  geom_line(aes(group = label)) +
+  geom_point(size = 2) +
+  labs(y = "", x = "") +
+  facet_grid( name ~ system, scale = "free_y") +
+  theme_bw() +
+  scale_linetype_manual(values = c("send" = "solid", "recv" = "dashed"),  # Customize the line types and labels
+                        labels = c("send" = "Envio", "recv" = "Recuperação")) +
+  guides(linetype = guide_legend(title = NULL)) +
+  theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
+
+# 
+# p12323 <-ggplot(ppp23213, aes(x = scenario, y = total_value, linetype = type)) +
+#   geom_line(aes(group = type)) +
+#   geom_point(size = 2) +
+#   labs(y = "", x = "") +
+#   facet_grid( name ~ system, scale = "free_y") + 
+#   theme_bw() + 
+#   guides(linetype = guide_legend(title = NULL)) + 
+#   theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
+
+# ggsave('./figures/sidechain-vs-onchain-metrics.png', fixed)
+
+```
+

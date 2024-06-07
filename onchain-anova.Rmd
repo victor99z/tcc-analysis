@@ -1,0 +1,161 @@
+---
+title: "onchain-anova"
+author: "Victor Bernardes"
+date: "2024-06-03"
+output: html_document
+---
+
+---
+title: "Onchain benchmarks"
+output:
+  html_document:
+    df_print: paged
+Author: Victor Bernardes
+Date: "2024-05-26"
+---
+
+# leitura de todos os datasets para onchain e setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(gridExtra)
+
+rm(list = ls())
+
+source('./functions.R', local = knitr::knit_global())
+
+
+benchSend4nodes <- read.csv('./data/onchain-1k/bench4nodes-1k-onchain-send', header = T)
+metricSend4nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-4nodes', header= T)
+
+benchSend8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-send', header = T)
+metricSend8nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-8nodes', header= T)
+
+benchSend12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-send', header = T)
+metricSend12nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-12nodes', header= T)
+
+benchSend16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-send', header = T)
+metricSend16nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-16nodes', header= T)
+
+benchRecv4nodes <-  read.csv('./data/onchain-1k/bench4nodes-1k-onchain-recv', header = T)
+metricRecv4nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-4nodes', header= T)
+
+benchRecv8nodes <- read.csv('./data/onchain-1k/bench8nodes-1k-onchain-recv', header = T)
+metricRecv8nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-8nodes', header= T)
+
+benchRecv12nodes <- read.csv('./data/onchain-1k/bench12nodes-1k-onchain-recv', header = T)
+metricRecv12nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-12nodes', header= T)
+
+benchRecv16nodes <- read.csv('./data/onchain-1k/bench16nodes-1k-onchain-recv', header = T)
+metricRecv16nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-16nodes', header= T)
+
+```
+
+# ANOVA PARA LATÊNCIAS
+
+```{r}
+
+bs4n <- benchSend4nodes$Latency[benchSend4nodes$responseCode == 200]
+bs8n <- benchSend8nodes$Latency[benchSend8nodes$responseCode == 200]
+bs12n <- benchSend12nodes$Latency[benchSend12nodes$responseCode == 200]
+bs16n <- benchSend16nodes$Latency[benchSend16nodes$responseCode == 200]
+
+br4n <- benchRecv4nodes$Latency[benchRecv4nodes$responseCode == 200]
+br8n <- benchRecv8nodes$Latency[benchRecv8nodes$responseCode == 200]
+br12n <- benchRecv12nodes$Latency[benchRecv12nodes$responseCode == 200]
+br16n <- benchRecv16nodes$Latency[benchRecv16nodes$responseCode == 200]
+
+
+
+data_grouped <- data.frame(
+  Latency = c(br4n, br8n, br12n, br16n),
+  Nodes = factor(rep(c(4, 8, 12, 16), times = c(length(br4n), length(br8n), length(br12n), length(br16n))))
+)
+
+# Ver os primeiros registros do data frame agrupado
+head(data_grouped)
+
+# Realizar a ANOVA
+resultado_anova <- aov(Latency ~ Nodes, data = data_grouped)
+
+# Resumo da ANOVA
+summary(resultado_anova)
+
+# Teste de Tukey (se necessário)
+teste_tukey <- TukeyHSD(resultado_anova, conf.level = 0.95)
+
+# Resumo do teste de Tukey
+teste_tukey
+
+
+```
+
+# ANOVA entre TPS para onchain (blockchain)
+
+```{r}
+
+# bs4n <- subset(benchSend4nodes, responseCode == 200)
+# bs8n <- subset(benchSend8nodes, responseCode == 200)
+# bs12n <- subset(benchSend12nodes, responseCode == 200)
+# bs16n <- subset(benchSend16nodes, responseCode == 200)
+br4n <- subset(benchRecv4nodes, responseCode == 200)
+br8n <- subset(benchRecv8nodes, responseCode == 200)
+br12n <- subset(benchRecv12nodes, responseCode == 200)
+br16n <- subset(benchRecv16nodes, responseCode == 200)
+
+# Calculando TPS para cada conjunto de dados
+# tpsbs4n <- getTps(bs4n)
+# tpsbs8n <- getTps(bs8n)
+# tpsbs12n <- getTps(bs12n)
+# tpsbs16n <- getTps(bs16n)
+tpsbr4n <- getTps(br4n)
+tpsbr8n <- getTps(br8n)
+tpsbr12n <- getTps(br12n)
+tpsbr16n <- getTps(br16n)
+
+new_df <- data.frame(
+  tps = c(tpsbr4n$transactions, tpsbr8n$transactions, tpsbr12n$transactions, tpsbr16n$transactions),
+  nodes = factor(rep(c(4, 8, 12, 16), times = c(length(tpsbr4n$transactions), length(tpsbr8n$transactions), length(tpsbr12n$transactions), length(tpsbr16n$transactions))))
+)
+
+# Realizando a ANOVA
+anova_result <- aov(tps ~ nodes, data = new_df)
+
+# Resumo dos resultados da ANOVA
+summary(anova_result)
+plot(anova_result)
+
+teste_tukey <- TukeyHSD(anova_result, conf.level = 0.9)
+teste_tukey
+plot(teste_tukey)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

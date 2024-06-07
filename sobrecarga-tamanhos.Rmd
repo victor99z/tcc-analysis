@@ -1,0 +1,139 @@
+---
+title: "sobrecarga-tamanhos"
+author: "Victor Bernardes"
+date: "2024-06-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+
+rm(list = ls()) # Apaga variaveis compartilhadas entre Rmd's
+
+source('./functions.R', local = knitr::knit_global())
+
+library(dplyr)
+library(readr)
+library(purrr)
+library(lubridate)
+library(ggplot2)
+library(stringr)
+
+# Defina o caminho do diretório
+dir_path <- "./data/sobrecarga"
+
+# Listar arquivos que correspondem ao padrão especificado
+all_bench <- list.files(path = dir_path, pattern = "sobrecarga-bench8nodes-(1mb|10mb|100mb)-sidechain-(send|recv)", full.names = TRUE)
+
+all_metrics <- list.files(path = dir_path, pattern = "metrics-sobrecarga-(send|recv)-(1mb|10mb|100mb)-8node-full", full.names = TRUE)
+
+# # Ler os arquivos CSV
+# all_bench <- all_bench %>% map(~ read_csv(.))
+# all_metrics <- all_metrics %>% map(~ read_csv(.))
+
+
+extract_metric <- function(file_name) {
+  nodes <- str_extract(file_name, "(8|16)node-full") %>% str_extract("\\d+")
+  size <- str_extract(file_name, "(1mb|10mb|100mb)") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)") 
+  size <- paste0(size, "MB")
+  data <- read_csv(file_name, show_col_types = FALSE)
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           size = size,
+           label = method)
+  return(data)
+}
+
+extract_info <- function(file_name) {
+  nodes <- str_extract(file_name, "bench(8|16)nodes") %>% str_extract("\\d+")
+  size <- str_extract(file_name, "(1mb|10mb|100mb)") %>% str_extract("\\d+")
+  method <- str_extract(file_name, "(send|recv)") 
+  size <- paste0(size, "MB")
+  data <- read_csv(file_name)
+  data <- data %>%
+    mutate(nodes = as.integer(nodes),
+           size = size,
+           label = method)
+  return(data)
+}
+
+
+
+
+
+```
+
+# Analise
+
+```{r}
+
+
+bench_list <- map(all_bench, extract_info)
+metric_list <- map(all_metrics, extract_metric)
+
+bench <- bind_rows(bench_list)
+metric <- bind_rows(metric_list)
+
+sexo1 <- bench %>%
+  filter(label %in% "send", responseCode == 200, nodes == 8, size == "1MB")
+
+sexo2 <- bench %>%
+  filter(label %in% "send", responseCode == 200, nodes == 8, size == "10MB")
+
+sexo3<- bench %>%
+  filter(label %in% "send", responseCode == 200, nodes == 8, size == "100MB")
+
+p <- ggplot(bench, aes(x = size, y = Latency, group =  size)) +
+  geom_point(size = 4) +
+  labs( x = "Tamanhos", y = "Latência (ms)") +
+  theme_bw(base_size = 20)
+
+print(p)
+
+# ggsave('./figures/tamanho-sobrecarga-dispersao.png', p)
+
+summary(sexo1$Latency)
+round(sd(sexo1$Latency), 2)
+quantile(sexo1$Latency, 0.99)
+
+summary(sexo2$Latency)
+round(sd(sexo2$Latency), 2)
+quantile(sexo2$Latency, 0.99)
+
+summary(sexo3$Latency)
+round(sd(sexo3$Latency), 2)
+quantile(sexo3$Latency, 0.99)
+
+
+
+```
+
+```{r}
+
+
+avg_mem <- metric %>%
+  filter(label == "send", nodes == 8, size == "100MB") %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE)) %>%
+  filter(name %in% c('system_memory_used', 'process_resident_memory_bytes'))
+
+avg_cpu <- metric %>%
+  filter(label == "send", nodes == 8, size == "100MB") %>%
+  group_by(name) %>%
+  summarise(avg_value = mean(value, na.rm = TRUE)) %>%
+  filter(name %in% c('process_cpu_seconds_total', 'system_cpu_sysload'))
+
+c_ipfs <- avg_cpu$avg_value[1]
+c_block <- avg_cpu$avg_value[2] / 10
+round(sum(c_block, c_ipfs),2)
+
+round(sum(avg_mem$avg_value[1], avg_mem$avg_value[2]) / (1024 * 1024), 2)
+
+
+```
+
+
+
+
+

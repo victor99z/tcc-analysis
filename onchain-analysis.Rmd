@@ -7,22 +7,20 @@ Author: Victor Bernardes
 Date: "2024-05-26"
 ---
 
+# leitura de todos os datasets para onchain e setup
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(dplyr)
 library(lubridate)
 library(ggplot2)
+library(gridExtra)
 
 rm(list = ls())
 
 source('./functions.R', local = knitr::knit_global())
 
-```
-
-# leitura de todos os datasets para onchain
-
-```{r}
 
 benchSend4nodes <- read.csv('./data/onchain-1k/bench4nodes-1k-onchain-send', header = T)
 metricSend4nodes <- read.csv('./data/onchain-1k/metric-send-1k-onchain-4nodes', header= T)
@@ -50,11 +48,12 @@ metricRecv16nodes <- read.csv('./data/onchain-1k/metric-recv-1k-onchain-16nodes'
 
 ```
 
+
 # Grafico comparativo entre as latencias por grupo de nós.
 
 -   Avaliar se é necessario utilizar talvez algum outro tipo de grafico como em linha
 
-# Gráfico para envio:
+# Latencia para envio:
 
 ```{r}
 
@@ -90,7 +89,7 @@ print(p)
 
 ```
 
-# Gráfico para recuperação:
+# Latência para recuperação:
 
 ```{r}
 
@@ -302,7 +301,7 @@ ggplot(merged_df_onchain, aes(x = scenario, y = tps)) +
   facet_grid(~case) + 
   theme_bw() 
 
-ggsave('./figures/onchain-tps-grouped.png')
+# ggsave('./figures/onchain-tps-grouped.png')
 
 
 ```
@@ -310,29 +309,13 @@ ggsave('./figures/onchain-tps-grouped.png')
 # Uso de CPU / ram / disco para ENVIO
 
 ```{r}
-ams4n <- metricSend4nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-ams8n <- metricSend8nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
 # Alguns problemas com undefined não sendo transformado em NA, força via as.integer
 metricSend12nodes$value <- as.integer(metricSend12nodes$value)
 
-ams12n <- metricSend12nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-ams16n <- metricSend16nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-ams4n <- getAvgOnchain(ams4n)
-ams8n <- getAvgOnchain(ams8n)
-ams12n <- getAvgOnchain(ams12n)
-ams16n <- getAvgOnchain(ams16n)
+ams4n <- getAvgOnchain(metricSend4nodes)
+ams8n <- getAvgOnchain(metricSend8nodes)
+ams12n <- getAvgOnchain(metricSend12nodes)
+ams16n <- getAvgOnchain(metricSend16nodes)
 
 ams4n <- ams4n %>%
   mutate(scenario = "4 nós")
@@ -396,7 +379,7 @@ plot_tps <- ggplot(df_avg_tps_send_onchain, aes(x = scenario, y = avg_value)) +
 
 
 # Arrange plots
-library(gridExtra)
+
 g <- grid.arrange(plot_memory, plot_cpu_sysload, plot_disk_rw, plot_tps, nrow = 2, ncol = 2)
 
 #ggsave('./figures/onchain-review-metrics-send.png', g)
@@ -407,26 +390,26 @@ g <- grid.arrange(plot_memory, plot_cpu_sysload, plot_disk_rw, plot_tps, nrow = 
 
 ```{r}
 
-amr4n <- metricRecv4nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
+# amr4n <- metricRecv4nodes %>%
+#   group_by(name) %>%
+#   summarise(avg_value = mean(value, na.rm = TRUE))
+# 
+# amr8n <- metricRecv8nodes %>%
+#   group_by(name) %>%
+#   summarise(avg_value = mean(value, na.rm = TRUE))
+# 
+# amr12n <- metricRecv12nodes %>%
+#   group_by(name) %>%
+#   summarise(avg_value = mean(value, na.rm = TRUE))
+# 
+# amr16n <- metricRecv16nodes %>%
+#   group_by(name) %>%
+#   summarise(avg_value = mean(value, na.rm = TRUE))
 
-amr8n <- metricRecv8nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-amr12n <- metricRecv12nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-amr16n <- metricRecv16nodes %>%
-  group_by(name) %>%
-  summarise(avg_value = mean(value, na.rm = TRUE))
-
-amr4n <- getAvgOnchain(amr4n)
-amr8n <- getAvgOnchain(amr8n)
-amr12n <- getAvgOnchain(amr12n)
-amr16n <- getAvgOnchain(amr16n)
+amr4n <- getAvgOnchain(metricRecv4nodes)
+amr8n <- getAvgOnchain(metricRecv8nodes)
+amr12n <- getAvgOnchain(metricRecv12nodes)
+amr16n <- getAvgOnchain(metricRecv16nodes)
 
 amr4n <- amr4n %>%
   mutate(scenario = "4 nós")
@@ -439,6 +422,8 @@ amr16n <- amr16n %>%
 
 df_metrics_recv_join <- rbind(amr4n, amr8n, amr12n, amr16n)
 df_metrics_recv_join$scenario <- factor(df_metrics_recv_join$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+df_metrics_send_join$scenario <- factor(df_metrics_recv_join$scenario, levels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+
 
 df_avg_tps_recv_onchain <- df_tps_recv_onchain %>%
     group_by(scenario) %>%
@@ -453,11 +438,17 @@ df_metrics_recv_join <- df_metrics_recv_join %>%
 df_metrics_send_join <- df_metrics_send_join %>%
   mutate(type = "send")
 
+merge_df_metrics <- rbind(df_metrics_recv_join, df_metrics_send_join)
+
+# Remove as métricas de disco 
+merge_df_metrics <- merge_df_metrics %>%
+  filter(!(name %in% c('system_disk_readbytes', 'system_disk_writebytes')))
+
 
 disk_data1 <- df_metrics_recv_join %>%
   filter(name %in% c("system_disk_readbytes", "system_disk_writebytes")) %>%
-  mutate(name = recode(name, 
-                       "system_disk_readbytes" = "Leitura", 
+  mutate(name = recode(name,
+                       "system_disk_readbytes" = "Leitura",
                        "system_disk_writebytes" = "Escrita"))
 
 plot_disk_rw1 <- ggplot(disk_data1, aes(x = scenario, y = avg_value, linetype = name)) +
@@ -472,19 +463,22 @@ plot_disk_rw1 <- ggplot(disk_data1, aes(x = scenario, y = avg_value, linetype = 
 
 
 # Plot for system_memory_used
-plot_memory1 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_memory_used", ], aes(x = scenario, y = avg_value)) +
-  geom_line(aes(group = name)) +
+plot_memory1 <- ggplot(
+  merge_df_metrics[merge_df_metrics$name == "system_memory_used", ],
+  aes(x = scenario, y = avg_value, linetype = type)) +
+  geom_line(aes(group = type)) +
   geom_point(size = 2) +
   labs(y = "Memória (MB)", x = "") +
-  theme_bw()
+  theme_bw() + 
+  theme(legend.position = "none")
 
 # Plot for system_cpu_sysload
-plot_cpu_sysload1 <- ggplot(df_metrics_recv_join[df_metrics_recv_join$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value)) +
-  geom_line(aes(group = name)) +
+plot_cpu_sysload1 <- ggplot(merge_df_metrics[merge_df_metrics$name == "system_cpu_sysload", ], aes(x = scenario, y = avg_value, linetype = type)) +
+  geom_line(aes(group = type)) +
   geom_point(size = 2) +
   labs(y = "CPU (%)", x = "") +
-  theme_bw()
-
+  theme_bw() + 
+  theme(legend.position = "none")
 
 df_avg_tps_send_onchain <- df_tps_send_onchain %>%
     group_by(scenario) %>%
@@ -493,44 +487,60 @@ df_avg_tps_send_onchain <- df_tps_send_onchain %>%
 df_avg_tps_send_onchain <- df_avg_tps_send_onchain %>%
     mutate(type = "send")
 
-plot_tps1 <- ggplot(df_avg_tps_recv_onchain, aes(x = scenario, y = avg_value)) +
+df_avg_tps_recv_onchain <- df_avg_tps_recv_onchain %>%
+    mutate(type = "recv")
+
+tps_joined <- rbind(df_avg_tps_recv_onchain, df_avg_tps_send_onchain)
+
+plot_tps1 <- ggplot(tps_joined, aes(x = scenario, y = avg_value, linetype = type)) +
   geom_line(aes(group = type)) +
   geom_point(size = 2) +
   labs(y = "TPS", x = "") +
-  theme_bw()
+  theme_bw() +
+  theme(legend.position = "none")
 
 
 # Arrange plots
-library(gridExtra)
+
 pp <- grid.arrange(plot_memory1, plot_cpu_sysload1, plot_disk_rw1, plot_tps1, nrow = 2, ncol = 2)
 
 # ggsave("./figures/onchain-review-metrics-recv.png", pp)
 
 ```
 
+# Agrupamento de todas as métricas onchain CPU e RAM (TESTE!!)
+
+```{r}
+
+merge_df_metrics_onchain <- merge_df_metrics %>%
+  filter(name %in% c("system_cpu_sysload", "system_memory_used")) %>%
+  mutate(name = recode(name, 
+                       "system_cpu_sysload" = "CPU (%)", 
+                       "system_memory_used" = "RAM (MB)")) %>%
+  mutate(system = "onchain")
+
+
+merge_df_metrics_sidechain <-  merge_df_metrics %>%
+  filter(name %in% c("system_cpu_sysload", "system_memory_used")) %>%
+  mutate(name = recode(name, 
+                       "system_cpu_sysload" = "CPU (%)", 
+                       "system_memory_used" = "RAM (MB)")) %>%
+  mutate(system = "sidechain")
+
+mm_metrics <- rbind(merge_df_metrics_sidechain, merge_df_metrics_onchain)
+
+ggplot(mm_metrics, aes(x = scenario, y = avg_value, linetype = type)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  # labs(y = "CPU (%)", x = "") +
+  facet_grid( name ~ system, scale = "free") + 
+  theme_bw() + 
+  guides(linetype = guide_legend(title = NULL)) + 
+  theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 # Quantidade de erros no envio e recuperação

@@ -386,11 +386,70 @@ plot_tps2 <- ggplot(df_avg_tps_recv_sidechain, aes(x = scenario, y = avg_value))
   theme_bw()
 
 
-# Arrange plots
-library(gridExtra)
 pp <- grid.arrange(plot_memory2, plot_cpu_sysload2, plot_disk_rw2, plot_tps2, nrow = 2, ncol = 2)
 
-ggsave('./figures/sidechain-review-metrics-recv.png', pp)
+# ggsave('./figures/sidechain-review-metrics-recv.png', pp)
 
 ```
+
+# Agrupamento de todas as métricas onchain e sidechain CPU e RAM
+
+```{r}
+
+merge_df_metrics_onchain <- merge_df_metrics %>%
+  filter(name %in% c("system_cpu_sysload", "system_memory_used")) %>%
+  mutate(name = recode(name, 
+                       "system_cpu_sysload" = "CPU (%)", 
+                       "system_memory_used" = "RAM (MB)")) %>%
+  mutate(system = "onchain")
+
+
+merge_df_metrics_sidechain <-  merge_df_metrics %>%
+  filter(name %in% c("system_cpu_sysload", "system_memory_used")) %>%
+  mutate(name = recode(name, 
+                       "system_cpu_sysload" = "CPU (%)", 
+                       "system_memory_used" = "RAM (MB)")) %>%
+  mutate(system = "sidechain")
+
+mm_metrics <- rbind(merge_df_metrics_sidechain, merge_df_metrics_onchain)
+
+ggplot(mm_metrics, aes(x = scenario, y = avg_value, linetype = type)) +
+  geom_line(aes(group = type)) +
+  geom_point(size = 2) +
+  # labs(y = "CPU (%)", x = "") +
+  facet_grid( name ~ system, scale = "free") + 
+  theme_bw() + 
+  guides(linetype = guide_legend(title = NULL)) + 
+  theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
+
+
+
+```
+
+
+# Juntar métricas de memoria e cpu IPFS0N + CLUSTER0N em um só
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
