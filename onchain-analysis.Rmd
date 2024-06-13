@@ -3,6 +3,7 @@ title: "Onchain benchmarks"
 output:
   html_document:
     df_print: paged
+  pdf_document: default
 Author: Victor Bernardes
 Date: "2024-05-26"
 ---
