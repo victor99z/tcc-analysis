@@ -84,16 +84,17 @@ s2 <- bench %>%
 s3<- bench %>%
   filter(label %in% "send", responseCode == 200, nodes == 8, size == "100MB")
 
+bench_revisado <- bench %>%
+  mutate(size = factor(size, levels = c("1MB", "10MB", "100MB")))
 
-
-p <- ggplot(bench, aes(x = size, y = Latency, group =  size)) +
+p <- ggplot(bench_revisado, aes(x = size, y = Latency, group =  size)) +
   geom_point(size = 4) +
   labs( x = "Tamanhos", y = "Latência (ms)") +
   theme_bw(base_size = 20)
 
 print(p)
 
-# ggsave('./figures/tamanho-sobrecarga-dispersao.png', p)
+ggsave('./figures/tamanho-sobrecarga-dispersao-revisado.png', p)
 
 ```
 
