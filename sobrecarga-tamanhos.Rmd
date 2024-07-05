@@ -75,14 +75,16 @@ metric_list <- map(all_metrics, extract_metric)
 bench <- bind_rows(bench_list)
 metric <- bind_rows(metric_list)
 
-sexo1 <- bench %>%
+s1 <- bench %>%
   filter(label %in% "send", responseCode == 200, nodes == 8, size == "1MB")
 
-sexo2 <- bench %>%
+s2 <- bench %>%
   filter(label %in% "send", responseCode == 200, nodes == 8, size == "10MB")
 
-sexo3<- bench %>%
+s3<- bench %>%
   filter(label %in% "send", responseCode == 200, nodes == 8, size == "100MB")
+
+
 
 p <- ggplot(bench, aes(x = size, y = Latency, group =  size)) +
   geom_point(size = 4) +
@@ -92,20 +94,6 @@ p <- ggplot(bench, aes(x = size, y = Latency, group =  size)) +
 print(p)
 
 # ggsave('./figures/tamanho-sobrecarga-dispersao.png', p)
-
-summary(sexo1$Latency)
-round(sd(sexo1$Latency), 2)
-quantile(sexo1$Latency, 0.99)
-
-summary(sexo2$Latency)
-round(sd(sexo2$Latency), 2)
-quantile(sexo2$Latency, 0.99)
-
-summary(sexo3$Latency)
-round(sd(sexo3$Latency), 2)
-quantile(sexo3$Latency, 0.99)
-
-
 
 ```
 

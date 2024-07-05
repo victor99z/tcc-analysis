@@ -72,8 +72,8 @@ br16n <- benchRecv16nodes$Latency[benchRecv16nodes$responseCode == 200]
 
 
 data_grouped <- data.frame(
-  Latency = c(br4n, br8n, br12n, br16n),
-  Nodes = factor(rep(c(4, 8, 12, 16), times = c(length(br4n), length(br8n), length(br12n), length(br16n))))
+  Latency = c(bs4n, bs8n, bs12n, bs16n),
+  Nodes = factor(rep(c(4, 8, 12, 16), times = c(length(bs4n), length(bs8n), length(bs12n), length(bs16n))))
 )
 
 # Ver os primeiros registros do data frame agrupado
@@ -84,6 +84,20 @@ resultado_anova <- aov(Latency ~ Nodes, data = data_grouped)
 
 # Resumo da ANOVA
 summary(resultado_anova)
+
+df1 <- 3
+df2 <- 3588
+alpha <- 0.01
+F_critico <- qf(1 - alpha, df1, df2)
+F_critico
+
+tmp <- data_grouped %>%
+  group_by(Nodes, Latency) %>%
+  filter(Nodes == "4")
+  
+mean_latency <- mean(tmp$Latency); round(mean_latency,1)
+cv <- sd(tmp$Latency) / mean_latency; round(cv,2)
+
 
 # Teste de Tukey (se necessário)
 teste_tukey <- TukeyHSD(resultado_anova, conf.level = 0.95)

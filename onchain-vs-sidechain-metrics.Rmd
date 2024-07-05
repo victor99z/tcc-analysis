@@ -305,7 +305,7 @@ gg <- bind_rows(all_sidechain, all_onchain)
 fixed <- ggplot(gg, aes(x = nodes, y = avg_value, linetype = label)) +
   geom_line(aes(group = label)) +
   geom_point(size = 2) +
-  labs(y = "", x = "") +
+  labs(y = "", x = "Número de nós na rede") +
   facet_grid( name ~ system, scale = "free_y") +
   theme_bw() +
   scale_linetype_manual(values = c("send" = "solid", "recv" = "dashed"),  # Customize the line types and labels
@@ -323,7 +323,7 @@ fixed <- ggplot(gg, aes(x = nodes, y = avg_value, linetype = label)) +
 #   guides(linetype = guide_legend(title = NULL)) + 
 #   theme(legend.position = "top", legend.key.size = unit(0.5, "cm"),)
 
-# ggsave('./figures/sidechain-vs-onchain-metrics.png', fixed)
+ggsave('./figures/sidechain-vs-onchain-metrics-revisado.png', fixed)
 
 ```
 

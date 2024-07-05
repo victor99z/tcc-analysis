@@ -155,10 +155,10 @@ combined_data <- bind_rows(data_list)
 
 # Filtrar os dados de requisições
 combined_data8 <- combined_data %>%
-  filter(label %in% "send", responseCode == 200, nodes == 8, size == "100MB")
+  filter(label %in% "recv", responseCode == 200, nodes == 8, size == "100MB")
 
 combined_data16 <- combined_data %>%
-  filter(label %in% "send", responseCode == 200, nodes == 16, size == "100MB")
+  filter(label %in% "recv", responseCode == 200, nodes == 16, size == "100MB")
 
 summary(combined_data8$Latency)
 round(sd(combined_data8$Latency), 2)
@@ -170,6 +170,13 @@ quantile(combined_data16$Latency, 0.99)
 
 plot(combined_data16$Latency)
 
+df_filtrado <- combined_data %>%
+  filter(size %in% c("100MB", "10MB", "1MB")) %>%
+  mutate(size = factor(size, levels = c("1MB", "10MB", "100MB")))
+
+df_filtrado <- df_filtrado %>%
+  filter(label == "recv", responseCode == 200) 
+
 # anova_result <- aov(Latency ~ nodes, data = rbind(combined_data8, combined_data16))
 # 
 # # Summary of ANOVA
@@ -180,17 +187,17 @@ plot(combined_data16$Latency)
 # tps
 #   
 # 
-# # Criar gráfico de dispersão
-# p <- ggplot(combined_data, aes(x = factor(nodes), y = Latency)) +
-#   geom_point() +
-#   facet_wrap(~ size) +
-#   labs(x = "Nós na rede",
-#        y = "Latência (ms)",
-#        color = "Número de nós") +
-#   theme_bw()
-# 
-# print(p)
+# Criar gráfico de dispersão
+p <- ggplot(df_filtrado, aes(x = factor(nodes), y = Latency)) +
+  geom_point() +
+  facet_wrap(~ size) +
+  labs(x = "Nós na rede",
+       y = "Latência (ms)",
+       color = "Número de nós") +
+  theme_bw()
 
-# ggsave('./figures/tamanhos-boxplot-recv.png', p)
+print(p)
+
+ggsave('./figures/tamanhos-boxplot-recv-revisado.png', p)
 
 ```

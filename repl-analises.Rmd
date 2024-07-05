@@ -17,6 +17,7 @@ library(purrr)
 library(lubridate)
 library(ggplot2)
 library(stringr)
+library(tidyr)
 
 
 # Defina o caminho do diretório
@@ -58,17 +59,19 @@ bench_filtered <- bench_list %>%
   filter(repl_min == repl_max, Latency < 250)
 
 
-qt <- ggplot(bench_filtered, aes(x = nodes, y = Latency, group =  label)) +
-  geom_boxplot() +
-  labs(x = "", y = "Latência (ms)") +
-  facet_grid( nodes ~ label, scales = "free", labeller = labeller(label = c(send = "Envio", recv = "Recuperação"))) +
-  coord_flip() + 
-  theme_bw()
+bench_filtered$nodes <- factor(bench_filtered$nodes, levels = c(4, 8, 12, 16), labels = c("4 nós", "8 nós", "12 nós", "16 nós"))
 
-print(qt)
-
+# qt <- ggplot(bench_filtered, aes(x = nodes, y = Latency, group =  label)) +
+#   geom_boxplot() +
+#   labs(x = "", y = "Latência (ms)") +
+#   facet_grid( nodes ~ label, scales = "free", labeller = labeller(label = c(send = "Envio", recv = "Recuperação"))) +
+#   coord_flip() + 
+#   theme_bw()
 # 
-# ggsave('./figures/repl-boxplot.png', qt)
+# print(qt)
+
+
+# ggsave('./figures/repl-boxplot-new.png', qt)
 
 
 # Quase foi 
@@ -117,27 +120,36 @@ unnested_filter <- filter %>%
 print(unnested_filter)
 
 # Step 3: Group by nodes and label again, and calculate avg_tps
+# filter1 <- unnested_filter %>%
+#   group_by(nodes, label) %>%
+#   summarise(avg_tps = mean(transactions, na.rm = TRUE), .groups = 'drop')
+
 filter1 <- unnested_filter %>%
   group_by(nodes, label) %>%
-  summarise(avg_tps = mean(transactions, na.rm = TRUE), .groups = 'drop')
+  summarise(
+    avg_tps = mean(transactions, na.rm = TRUE),
+    sd_tps = sd(transactions, na.rm = TRUE),
+    .groups = 'drop'
+  )
 
 # Check the final result
 print(filter1)
 
-filter1$nodes <- factor(filter1$nodes, levels = c(4, 8, 12, 16), labels = c("4 nós", "8 nós", "12 nós", "16 nós"))
+# filter1$nodes <- factor(filter1$nodes, levels = c(4, 8, 12, 16), labels = c("4 nós", "8 nós", "12 nós", "16 nós"))
 
 filter1$label <- factor(filter1$label, levels = c("recv", "send"), labels = c("Recuperação", "Envio"))
 
-
 ppp <- ggplot(filter1, aes(x = nodes, y = avg_tps, fill = label)) +
   geom_bar(stat = "identity", position = "dodge") +
+  # geom_errorbar( aes(x=nodes, ymin=avg_tps-sd, ymax=avg_tps+sd), width=0.2, colour="black", alpha=0.9, size=0.8) + 
+  geom_errorbar(aes(ymin=avg_tps-sd_tps, ymax=avg_tps+sd_tps), width=.2,position=position_dodge(.9)) +
   labs(x = "Nós da rede", y = "Transações por segundo", fill = "label") +
   theme_bw(base_size = 14) +
   theme(legend.title = element_blank()) +
   scale_fill_grey()
 
 
-ggsave('./figures/repl-barra-tps.png',ppp)
+# ggsave('./figures/repl-barra-tps-revisado.png',ppp)
 ```
 
 
